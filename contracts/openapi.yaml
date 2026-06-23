@@ -1,0 +1,268 @@
+openapi: 3.0.3
+info:
+  title: TriageDesk API — FROZEN CONTRACT (agree in Hour 1)
+  description: >
+    REST surface between the Next.js frontend (Member C) and the FastAPI
+    backend (Member A). Auth is handled by Supabase on the frontend; the
+    frontend sends the Supabase JWT as `Authorization: Bearer <token>`, which
+    the backend validates. This file is the agreed shape — build against it
+    with stubs/fixtures so frontend and backend never block each other.
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:8000
+    description: Local FastAPI
+
+security:
+  - SupabaseJWT: []
+
+paths:
+  /health:
+    get:
+      summary: Liveness probe
+      security: []
+      responses:
+        "200": { description: OK }
+
+  /tickets:
+    get:
+      summary: List tickets (inbox)
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [open, in_progress, awaiting_human, resolved, escalated, refused] }
+      responses:
+        "200":
+          description: Ticket list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TicketSummary" }
+    post:
+      summary: Create a ticket (MOCK inbound email / "new ticket" form)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTicketRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ticket" }
+
+  /tickets/{id}:
+    get:
+      summary: Get full ticket detail (incl. draft, classification, status)
+      parameters: [ { $ref: "#/components/parameters/TicketId" } ]
+      responses:
+        "200":
+          description: Ticket
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ticket" }
+        "404": { description: Not found }
+
+  /tickets/{id}/run:
+    post:
+      summary: >
+        Start (or resume) the supervisor-brain run for this ticket. Runs the
+        LangGraph until it finishes, refuses, escalates, or interrupts for HITL.
+      parameters: [ { $ref: "#/components/parameters/TicketId" } ]
+      responses:
+        "200":
+          description: Run result / current state snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RunResult" }
+
+  /tickets/{id}/trace:
+    get:
+      summary: Get the brain's reasoning trace (scratchpad) for the UI
+      parameters: [ { $ref: "#/components/parameters/TicketId" } ]
+      responses:
+        "200":
+          description: Ordered list of tool calls + results + reasons
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TraceStep" }
+
+  /tickets/{id}/decision:
+    post:
+      summary: Human-in-the-loop decision; resumes the interrupted graph
+      parameters: [ { $ref: "#/components/parameters/TicketId" } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DecisionRequest" }
+      responses:
+        "200":
+          description: Updated run result after the action executed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RunResult" }
+
+  /kb/documents:
+    get:
+      summary: List KB documents (admin)
+      responses:
+        "200":
+          description: Documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/KbDocument" }
+
+  /kb/upload:
+    post:
+      summary: Upload a KB doc (admin) → chunk + embed + index live
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+                title: { type: string }
+      responses:
+        "201":
+          description: Indexed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  document_id: { type: string }
+                  chunks_indexed: { type: integer }
+
+  /analytics:
+    get:
+      summary: Dashboard metrics
+      responses:
+        "200":
+          description: Aggregated metrics
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Analytics" }
+
+components:
+  securitySchemes:
+    SupabaseJWT:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    TicketId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string }
+      example: TCK-1001
+
+  schemas:
+    CreateTicketRequest:
+      type: object
+      required: [subject, body]
+      properties:
+        subject: { type: string }
+        body: { type: string }
+        customer_email: { type: string }
+
+    TicketSummary:
+      type: object
+      properties:
+        id: { type: string }
+        subject: { type: string }
+        status: { type: string }
+        category: { type: string }
+        severity: { type: string }
+        created_at: { type: string, format: date-time }
+
+    Ticket:
+      type: object
+      description: Full ticket; mirrors fields a UI needs from SupportState.
+      properties:
+        id: { type: string }
+        customer_id: { type: string, nullable: true }
+        subject: { type: string }
+        body: { type: string }
+        status: { type: string }
+        classification:
+          type: object
+          nullable: true
+          description: See contracts/schemas.py::Classification
+        draft:
+          type: object
+          nullable: true
+          description: See contracts/schemas.py::DraftReply
+        guardrail_result:
+          type: object
+          nullable: true
+          description: See contracts/schemas.py::GuardrailResult
+        awaiting_action: { type: string, nullable: true }
+        final_reply: { type: string, nullable: true }
+        escalated: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    RunResult:
+      type: object
+      properties:
+        ticket_id: { type: string }
+        route: { type: string, enum: [continue, await_human, escalate, refuse, done] }
+        awaiting_action: { type: string, nullable: true }
+        draft:
+          type: object
+          nullable: true
+        guardrail_result:
+          type: object
+          nullable: true
+        final_reply: { type: string, nullable: true }
+        step_count: { type: integer }
+
+    TraceStep:
+      type: object
+      properties:
+        step: { type: integer }
+        tool: { type: string }
+        reason: { type: string }
+        args: { type: object }
+        result: { type: object }
+        ok: { type: boolean }
+
+    DecisionRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [approve, edit_approve, escalate, approve_refund, reject]
+        edited_reply:
+          type: string
+          nullable: true
+          description: Required when action == edit_approve
+
+    KbDocument:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        created_at: { type: string, format: date-time }
+
+    Analytics:
+      type: object
+      properties:
+        total_tickets: { type: integer }
+        resolved: { type: integer }
+        escalated: { type: integer }
+        refused: { type: integer }
+        escalation_rate: { type: number }
+        avg_steps_per_ticket: { type: number }
+        avg_resolution_seconds: { type: number, nullable: true }

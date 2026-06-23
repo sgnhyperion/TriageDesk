@@ -1,0 +1,25 @@
+# Backend dependencies (Python 3.11+). Owner: Member A.
+# From repo root: python -m venv .venv && source .venv/bin/activate && pip install -r backend/requirements.txt
+
+# Web framework
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9        # file uploads (KB)
+python-dotenv>=1.0
+
+# Orchestration
+langgraph>=0.2.0
+langchain>=0.2.0
+langchain-google-genai>=1.0    # Gemini chat + embeddings
+langgraph-checkpoint-postgres>=1.0  # HITL pause/resume
+
+# Data / integrations
+supabase>=2.4                  # Supabase client (DB, storage, auth admin)
+psycopg[binary]>=3.1           # Postgres driver (checkpointer)
+resend>=0.8                    # real outbound email
+
+# Observability
+langsmith>=0.1
+
+# Testing (eval suite)
+pytest>=8.0

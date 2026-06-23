@@ -1,0 +1,15 @@
+# Next.js / Node — frontend-specific ignores (config lives with its stack)
+node_modules/
+/.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# local env
+.env*.local
+
+# logs
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
