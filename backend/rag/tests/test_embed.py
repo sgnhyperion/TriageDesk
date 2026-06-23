@@ -1,7 +1,11 @@
 """Tests for Gemini embeddings (Member B). Skipped until GEMINI_API_KEY is set."""
 from __future__ import annotations
 
+import pytest
+
 from backend.rag import embed
+
+pytestmark = pytest.mark.usefixtures("rag_env")  # all need a real key
 
 
 def test_embed_query_dim():
