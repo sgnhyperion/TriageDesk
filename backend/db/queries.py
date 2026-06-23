@@ -14,6 +14,8 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Sequence
 
+from psycopg.types.json import Json
+
 from backend.db.client import get_pool
 
 Params = Sequence[Any] | None
@@ -58,3 +60,14 @@ def execute(sql: str, params: Params = None) -> dict | None:
     with get_pool().connection() as conn:
         cur = conn.execute(sql, params or ())
         return cur.fetchone() if cur.description else None
+
+
+def write_audit(action: str, detail: dict, ticket_id: str | None = None,
+                actor: str | None = None) -> None:
+    """Append an audit_log row. Used for every high-impact action (refund, email)
+    and human decision. ticket_id is FK-safe (NULL if the ticket isn't stored).
+    """
+    execute(
+        "insert into audit_log (ticket_id, actor, action, detail) "
+        "values ((select id from tickets where id = %s), %s, %s, %s)",
+        (ticket_id, actor, action, Json(detail)))
