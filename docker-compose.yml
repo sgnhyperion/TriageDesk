@@ -1,0 +1,32 @@
+# Local dev database for TriageDesk (Member B).
+#
+# We run Postgres + pgvector locally instead of Supabase so the tools, RAG, and
+# analytics are fully buildable and testable offline. The query layer talks to
+# this over DATABASE_URL via psycopg — the *same* code works against Supabase's
+# Postgres connection string later, so this is a drop-in, swappable backend.
+#
+#   docker compose up -d           # start the db
+#   python backend/db/apply_schema.py   # create the schema (auth-shim + contract)
+#
+# Connection string (matches backend/.env DATABASE_URL):
+#   postgresql://postgres:postgres@localhost:5432/triagedesk
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: triagedesk-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: triagedesk
+    ports:
+      - "5432:5432"
+    volumes:
+      - triagedesk_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d triagedesk"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  triagedesk_pgdata:
