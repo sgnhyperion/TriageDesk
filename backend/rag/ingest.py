@@ -18,6 +18,8 @@ from backend.rag.embed import embed_texts
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SEED_KB_DIR = _REPO_ROOT / "data" / "kb"
+# Admin-uploaded files land here (local stand-in for Supabase Storage; swappable).
+_UPLOAD_DIR = _REPO_ROOT / "data" / "kb_uploads"
 
 # Chunking: word windows with overlap. ~200 words ≈ a paragraph or two — small
 # enough to be specific, with overlap so a fact split across a boundary is still
@@ -101,6 +103,27 @@ def ingest_seed_kb() -> list[dict]:
         res = ingest_document(title, path.read_bytes(), source_path=str(path.relative_to(_REPO_ROOT)))
         results.append({"title": title, **res})
     return results
+
+
+def save_and_ingest_upload(filename: str, file_bytes: bytes, title: str | None = None,
+                           uploaded_by: str | None = None) -> dict:
+    """Back POST /kb/upload: persist the uploaded file locally, then ingest it so
+    it's searchable immediately. Returns {"document_id", "chunks_indexed"}.
+    """
+    _UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    dest = _UPLOAD_DIR / filename
+    dest.write_bytes(file_bytes)
+    doc_title = title or Path(filename).stem.replace("_", " ").title()
+    return ingest_document(doc_title, file_bytes, uploaded_by=uploaded_by,
+                           source_path=str(dest.relative_to(_REPO_ROOT)))
+
+
+def list_kb_documents() -> list[dict]:
+    """Back GET /kb/documents — id/title/created_at per the openapi KbDocument."""
+    rows = queries.fetch_all(
+        "select id, title, created_at from kb_documents order by created_at desc")
+    return queries.jsonable([{"id": str(r["id"]), "title": r["title"],
+                              "created_at": r["created_at"]} for r in rows])
 
 
 if __name__ == "__main__":

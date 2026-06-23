@@ -4,12 +4,13 @@ FastAPI routes implementing contracts/openapi.yaml. Owner: Member A.
 These work on the stub store + stub brain so the frontend (Member C) has a live
 API to build against immediately. Swap stubs for real pieces as they land.
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from contracts.schemas import HumanAction
 from backend import store, supervisor, analytics
 from backend.agents import triage
+from backend.rag import ingest
 
 router = APIRouter()
 
@@ -102,7 +103,17 @@ def decide(ticket_id: str, req: DecisionRequest):
 
 @router.get("/kb/documents")
 def list_kb_documents():
-    return []  # TODO(Member B)
+    return ingest.list_kb_documents()
+
+
+@router.post("/kb/upload")
+async def upload_kb_document(file: UploadFile = File(...), title: str | None = Form(None)):
+    """Admin KB upload: file -> chunk -> embed -> index, searchable live."""
+    file_bytes = await file.read()
+    try:
+        return ingest.save_and_ingest_upload(file.filename, file_bytes, title=title)
+    except Exception as exc:
+        raise HTTPException(400, f"KB ingest failed: {exc}")
 
 
 @router.get("/analytics")

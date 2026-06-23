@@ -24,3 +24,6 @@ node_modules/
 # Misc
 *.log
 .langgraph_cache/
+
+# Runtime KB uploads (local stand-in for Supabase Storage)
+data/kb_uploads/
