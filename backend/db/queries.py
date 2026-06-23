@@ -10,11 +10,30 @@ interpolation — so we're injection-safe by construction.
 """
 from __future__ import annotations
 
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Sequence
 
 from backend.db.client import get_pool
 
 Params = Sequence[Any] | None
+
+
+def jsonable(value: Any) -> Any:
+    """Recursively convert DB values (datetime/date/Decimal) into JSON-safe types.
+
+    Tool outputs land in ToolResult.output and are persisted to jsonb / sent over
+    the API, so timestamps must be ISO strings rather than Python datetimes.
+    """
+    if isinstance(value, dict):
+        return {k: jsonable(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [jsonable(v) for v in value]
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
 
 
 def fetch_all(sql: str, params: Params = None) -> list[dict]:
