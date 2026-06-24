@@ -32,11 +32,7 @@ export function KbUpload() {
       setFile(null);
       await refresh();
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? `${err.message} — KB upload needs the live backend (Member B).`
-          : "Upload failed"
-      );
+      setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setBusy(false);
     }

@@ -142,7 +142,17 @@ export async function uploadKbDoc(
     body: form,
     headers, // no Content-Type — the browser sets the multipart boundary
   });
-  if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    // Surface the backend's real reason (FastAPI puts it in `detail`).
+    let detail = `${res.status} ${res.statusText}`;
+    try {
+      const body = await res.json();
+      if (body?.detail) detail = body.detail;
+    } catch {
+      /* non-JSON error body — keep the status line */
+    }
+    throw new ApiError(res.status, detail);
+  }
   return res.json() as Promise<KbUploadResult>;
 }
 
