@@ -21,8 +21,7 @@ cryptography>=43               # ES256/RS256 verification for Supabase JWKS (asy
 # Data / integrations
 supabase>=2.4                  # Supabase client (DB, storage, auth admin)
 psycopg[binary]>=3.1           # Postgres driver (checkpointer)
-resend>=0.8                    # outbound email (EMAIL_PROVIDER=resend)
-sendgrid>=6.11                 # outbound email (EMAIL_PROVIDER=sendgrid; single-sender, no domain)
+resend>=0.8                    # real outbound email
 
 # Observability
 langsmith>=0.1

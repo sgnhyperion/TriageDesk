@@ -1,19 +1,13 @@
-"""Real outbound email. Owner: Member B. HIGH-IMPACT / HITL (after approval).
+"""Real outbound email via Resend. Owner: Member B. HIGH-IMPACT / HITL (after approval).
 
-Provider-switchable via EMAIL_PROVIDER (resend | sendgrid):
-  * resend   — needs a verified domain to email arbitrary addresses (the shared
-               onboarding@resend.dev sender only reaches your own account email).
-  * sendgrid — "Single Sender Verification" lets you verify ONE from-address and
-               then email ANY recipient with no domain (handy for demos).
-
-Key-guarded: with the provider's key set it sends for real; otherwise it records
-the intent so the flow stays demoable. Either way it writes an outbound `messages`
-row + an `audit_log` entry, so the UI/audit trail show "we sent this" regardless.
+Key-guarded: when RESEND_API_KEY is set it sends for real; otherwise it records
+the intent so the whole flow stays demoable without a key. Either way it writes
+an outbound `messages` row + an `audit_log` entry, so the UI and audit trail show
+"we sent this" regardless. Flip the env var to go live — zero code change.
 """
 from __future__ import annotations
 
 import os
-import re
 
 from contracts.schemas import SupportState, ToolName, ToolResult
 from backend.db import queries
@@ -38,61 +32,32 @@ def _body(args: dict, state: SupportState) -> str:
     return args.get("body", "")
 
 
-def _send_resend(to: str | None, subject: str, body: str) -> tuple[bool, str | None, str | None]:
-    api_key = os.getenv("RESEND_API_KEY")
-    if not api_key:
-        return False, None, "RESEND_API_KEY not set — recorded intent only (no real send)"
-    if not to:
-        return False, None, "no recipient email resolved"
-    try:
-        import resend
-        resend.api_key = api_key
-        resp = resend.Emails.send({
-            "from": os.getenv("RESEND_FROM", "TriageDesk <onboarding@resend.dev>"),
-            "to": [to], "subject": subject, "html": f"<div>{body}</div>",
-        })
-        mid = resp.get("id") if isinstance(resp, dict) else getattr(resp, "id", None)
-        return True, mid, None
-    except Exception as exc:  # never crash the brain on a send failure
-        return False, None, str(exc)
-
-
-def _send_sendgrid(to: str | None, subject: str, body: str) -> tuple[bool, str | None, str | None]:
-    api_key = os.getenv("SENDGRID_API_KEY")
-    if not api_key:
-        return False, None, "SENDGRID_API_KEY not set — recorded intent only (no real send)"
-    if not to:
-        return False, None, "no recipient email resolved"
-    # SendGrid wants a bare from-address; accept "Name <email>" or "email".
-    raw_from = os.getenv("SENDGRID_FROM") or os.getenv("RESEND_FROM", "onboarding@resend.dev")
-    m = re.search(r"<([^>]+)>", raw_from)
-    from_email = m.group(1) if m else raw_from.strip()
-    try:
-        import sendgrid
-        from sendgrid.helpers.mail import Mail
-        message = Mail(from_email=from_email, to_emails=to, subject=subject,
-                       html_content=f"<div>{body}</div>")
-        resp = sendgrid.SendGridAPIClient(api_key).send(message)
-        ok = 200 <= resp.status_code < 300
-        mid = resp.headers.get("X-Message-Id") if getattr(resp, "headers", None) else None
-        return ok, mid, None if ok else f"sendgrid returned status {resp.status_code}"
-    except Exception as exc:  # never crash the brain on a send failure
-        return False, None, str(exc)
-
-
-def _send_via_provider(to: str | None, subject: str, body: str) -> tuple[bool, str | None, str | None]:
-    """Dispatch to the configured EMAIL_PROVIDER (resend | sendgrid)."""
-    if (os.getenv("EMAIL_PROVIDER") or "resend").strip().lower() == "sendgrid":
-        return _send_sendgrid(to, subject, body)
-    return _send_resend(to, subject, body)
-
-
 def send_email(args: dict, state: SupportState) -> ToolResult:
     to = _recipient(args, state)
     subject = args.get("subject") or f"Re: {state.ticket_subject}"
     body = _body(args, state)
 
-    sent, provider_message_id, error = _send_via_provider(to, subject, body)
+    api_key = os.getenv("RESEND_API_KEY")
+    sent = False
+    provider_message_id = None
+    error = None
+
+    if api_key and to:
+        try:
+            import resend
+            resend.api_key = api_key
+            resp = resend.Emails.send({
+                "from": os.getenv("RESEND_FROM", "TriageDesk <onboarding@resend.dev>"),
+                "to": [to],
+                "subject": subject,
+                "html": f"<div>{body}</div>",
+            })
+            provider_message_id = resp.get("id") if isinstance(resp, dict) else getattr(resp, "id", None)
+            sent = True
+        except Exception as exc:  # never crash the brain on a send failure
+            error = str(exc)
+    elif not api_key:
+        error = "RESEND_API_KEY not set — recorded intent only (no real send)"
 
     # Persist the outbound message (FK-safe: only if the ticket exists).
     if body and queries.fetch_one("select 1 as x from tickets where id = %s", (state.ticket_id,)):
