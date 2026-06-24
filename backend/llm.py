@@ -116,9 +116,12 @@ def get_embeddings():
         raise RuntimeError(
             "GEMINI_API_KEY is required for embeddings (Anthropic has no embeddings API)."
         )
+    # gemini-embedding-001 supports a configurable output dimension (Matryoshka);
+    # we request 768 to match kb_chunks.embedding vector(768) in schema.sql.
     return GoogleGenerativeAIEmbeddings(
-        model=os.getenv("GEMINI_EMBED_MODEL", "models/text-embedding-004"),
+        model=os.getenv("GEMINI_EMBED_MODEL", "gemini-embedding-001"),
         google_api_key=key,
+        output_dimensionality=int(os.getenv("GEMINI_EMBED_DIM", "768")),
     )
 
 

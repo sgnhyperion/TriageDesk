@@ -7,11 +7,16 @@ instead of hallucinating an answer the KB doesn't support.
 """
 from __future__ import annotations
 
+import os
+
 from contracts.schemas import RetrievedChunk, RetrievedContext, SupportState, ToolName, ToolResult
 from backend.db import queries
 from backend.rag.embed import embed_query
 
-GROUNDING_THRESHOLD = 0.70  # top score below this => no grounding => escalate
+# Top score below this => no grounding => the brain escalates instead of
+# hallucinating. Calibrated for gemini-embedding-001 @768 (relevant queries
+# score ~0.64-0.68, unrelated ~0.52); override with the GROUNDING_THRESHOLD env.
+GROUNDING_THRESHOLD = float(os.getenv("GROUNDING_THRESHOLD", "0.58"))
 
 
 def retrieve_kb(args: dict, state: SupportState) -> ToolResult:

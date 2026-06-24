@@ -22,13 +22,24 @@ docs/        # onboarding, project plan, demo script
 ```
 
 ## Run the backend
-Works **with no API keys** (deterministic fallback brain) and lights up the real LLM the moment a
-key is configured — no code change.
+The brain works **with no API keys** (deterministic fallback) and lights up the real LLM the moment a
+key is configured — no code change. The data layer (tickets, tools, RAG) needs Postgres.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
-uvicorn backend.main:app --reload          # http://localhost:8000/docs
+
+# 1. Database (Postgres + pgvector) — local dev:
+docker compose up -d
+cp backend/.env.example backend/.env        # DATABASE_URL already points at the local DB
+python backend/db/apply_schema.py           # create the schema
+python backend/db/seed.py                    # seed demo customers/orders/tickets
+python -c "from backend.rag import ingest; ingest.ingest_seed_kb()"   # index the seed KB (needs GEMINI_API_KEY)
+
+# 2. API
+uvicorn backend.main:app --reload            # http://localhost:8000/docs
 ```
+> No Docker? Point `DATABASE_URL` at any Postgres+pgvector (e.g. a Supabase session-pooler URI) and run the same `apply_schema.py` / `seed.py`. With no reachable DB the API still boots and DB-backed tools degrade gracefully.
+
 Try it:
 ```bash
 curl -X POST http://localhost:8000/tickets/TCK-1003/run        # brain runs, pauses for approval
@@ -69,19 +80,24 @@ cp .env.local.example .env.local           # fill in Supabase + API URL
 npm run dev                                 # http://localhost:3000
 ```
 
-## Run tests (eval suite)
+## Run tests
 ```bash
-pytest backend/tests -q
+pytest backend/tests -q                                   # orchestration unit tests (offline)
+TRIAGEDESK_TEST_DB="$DATABASE_URL" pytest backend/tests backend/tools/tests backend/rag/tests -q   # full suite (needs DB)
 ```
 
 ## Status
-🟢 **Member A (backend brain) — implemented & verified.** Real governed supervisor brain +
-guardrails, 3 agents, LangGraph `StateGraph` with `interrupt()`/resume HITL on a Postgres
-checkpointer, FastAPI routes, Supabase JWT auth, LangSmith tracing, dynamic Gemini/Claude provider
-switching, and graceful LLM fallback. Verified live against Gemini, Claude, and a real Supabase
-database.
-🟡 **Member B (tools/RAG) & Member C (frontend/eval) — in progress.** The brain runs on stub tools
-until B's real tools are wired into `backend/tools/registry.py`; C builds against the live API.
+🟢 **Integrated and verified end-to-end.** All three slices are wired together and run as one system:
+governed LangGraph supervisor brain + guardrails + HITL (Postgres checkpointer) → 9 Postgres-backed
+tools → pgvector RAG → Resend email → analytics → Next.js UI with the reasoning-trace and approval
+panel. Verified live: the brain autonomously runs `lookup_customer → lookup_order → process_refund`
+on the seeded duplicate-charge ticket, pauses for human approval, and resumes — over real HTTP,
+against real Postgres, with the real LLM. **85 backend tests pass** (with the DB); the frontend
+builds clean.
+
+Provider/DB are swappable by config: `LLM_PROVIDER=gemini|anthropic`, `DATABASE_URL=local|Supabase`.
+Everything degrades gracefully — no key → deterministic brain, no DB → fast-fail tools, no Supabase
+→ frontend mock mode + open-auth dev mode.
 
 ## Ownership
 - **Member A** (Harsh): backend brain, LangGraph, HITL, API, auth, observability — `backend/{supervisor,graph,agents,api,auth,observability,llm,prompts}.py`

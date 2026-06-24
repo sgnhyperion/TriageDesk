@@ -37,11 +37,15 @@ def get_pool() -> ConnectionPool:
     `ok=False` ToolResult, and the brain degrades gracefully instead of hanging.
     """
     connect_timeout = int(os.getenv("DB_CONNECT_TIMEOUT", "8"))
+    # Raise ivfflat.probes on every connection so KB retrieval has full recall at
+    # the project's small KB scale (default probes=1 only scans one list, which
+    # misses chunks when the table is tiny). Tunable via IVFFLAT_PROBES.
+    options = f"-c ivfflat.probes={os.getenv('IVFFLAT_PROBES', '100')}"
     return ConnectionPool(
         conninfo=get_dsn(),
         min_size=1,
         max_size=5,
-        kwargs={"row_factory": dict_row, "connect_timeout": connect_timeout},
+        kwargs={"row_factory": dict_row, "connect_timeout": connect_timeout, "options": options},
         timeout=float(os.getenv("DB_POOL_TIMEOUT", str(connect_timeout))),
         open=True,
     )
