@@ -10,8 +10,12 @@ python-dotenv>=1.0
 # Orchestration
 langgraph>=0.2.0
 langchain>=0.2.0
-langchain-google-genai>=1.0    # Gemini chat + embeddings
+langchain-google-genai>=1.0    # Gemini chat + embeddings (default provider)
+langchain-anthropic>=0.2        # Claude chat (LLM_PROVIDER=anthropic)
 langgraph-checkpoint-postgres>=1.0  # HITL pause/resume
+
+# Auth
+pyjwt>=2.8                     # validate Supabase JWTs on protected routes
 
 # Data / integrations
 supabase>=2.4                  # Supabase client (DB, storage, auth admin)
@@ -23,3 +27,4 @@ langsmith>=0.1
 
 # Testing (eval suite)
 pytest>=8.0
+httpx>=0.27                    # FastAPI TestClient (API integration tests)

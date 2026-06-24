@@ -10,7 +10,8 @@ approving every high-impact action** (sending email, processing refunds).
 
 ## Stack
 FastAPI + LangGraph (Python) · Next.js (frontend) · Supabase (Postgres + Auth + pgvector + Storage)
-· Gemini (LLM + embeddings) · Resend (email) · LangSmith (tracing).
+· **Gemini or Claude** (LLM, switchable via `LLM_PROVIDER`) · Gemini embeddings · Resend (email)
+· LangSmith (tracing).
 
 ## Repo layout
 ```
@@ -20,7 +21,9 @@ frontend/    # Next.js app (Member C)
 docs/        # onboarding, project plan, demo script
 ```
 
-## Run the backend (stub — works without any API keys yet)
+## Run the backend
+Works **with no API keys** (deterministic fallback brain) and lights up the real LLM the moment a
+key is configured — no code change.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
@@ -32,6 +35,30 @@ curl -X POST http://localhost:8000/tickets/TCK-1003/run        # brain runs, pau
 curl http://localhost:8000/tickets/TCK-1003/trace              # the brain's reasoning trace
 curl -X POST http://localhost:8000/tickets/TCK-1003/decision \
      -H 'Content-Type: application/json' -d '{"action":"approve"}'   # human approves -> sends
+```
+
+### Configure real mode (optional)
+```bash
+cp backend/.env.example backend/.env        # then fill in the keys you have
+```
+`backend/.env` (gitignored) is auto-loaded. Key settings:
+
+| Var | Purpose |
+|---|---|
+| `LLM_PROVIDER` | `gemini` (free tier) **or** `anthropic` (Claude, pay-as-you-go) — the brain works on either |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | Gemini chat; also used for embeddings regardless of provider |
+| `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | Claude chat (e.g. `claude-haiku-4-5` — fast/cheap; `claude-opus-4-8` is slow here) |
+| `DATABASE_URL` | Supabase **session-pooler** URI → real Postgres HITL checkpointer (else in-memory) |
+| `SUPABASE_JWT_SECRET` | enables JWT auth on protected routes (unset = open dev mode) |
+| `LANGSMITH_API_KEY` | enables LangSmith tracing |
+
+Switch LLM provider any time by editing one line (`LLM_PROVIDER=gemini|anthropic`). Quotas/outages
+degrade gracefully — the brain falls back to deterministic behavior instead of crashing.
+
+### Live smoke test
+Verifies whatever is configured (real LLM + Postgres + LangSmith) end-to-end through the HITL flow:
+```bash
+python -m backend.scripts.smoke
 ```
 
 ## Run the frontend
@@ -48,11 +75,15 @@ pytest backend/tests -q
 ```
 
 ## Status
-🟡 **Skeleton / stubs.** The structure boots end-to-end on a fake rule-based brain and stub tools so
-all three of us can build in parallel. Each `TODO(Member X)` marks where real logic goes. See the
-onboarding doc for who owns what.
+🟢 **Member A (backend brain) — implemented & verified.** Real governed supervisor brain +
+guardrails, 3 agents, LangGraph `StateGraph` with `interrupt()`/resume HITL on a Postgres
+checkpointer, FastAPI routes, Supabase JWT auth, LangSmith tracing, dynamic Gemini/Claude provider
+switching, and graceful LLM fallback. Verified live against Gemini, Claude, and a real Supabase
+database.
+🟡 **Member B (tools/RAG) & Member C (frontend/eval) — in progress.** The brain runs on stub tools
+until B's real tools are wired into `backend/tools/registry.py`; C builds against the live API.
 
-## Ownership (fill in names)
-- **Member A** (____): backend brain, LangGraph, HITL, API — `backend/{supervisor,graph,agents,api}.py`
+## Ownership
+- **Member A** (Harsh): backend brain, LangGraph, HITL, API, auth, observability — `backend/{supervisor,graph,agents,api,auth,observability,llm,prompts}.py`
 - **Member B** (____): DB, 9 tools, RAG, email, analytics — `backend/{tools,rag,integrations,db}/`
 - **Member C** (____): Next.js UI, approval screen, eval, demo — `frontend/`, `backend/tests/`
