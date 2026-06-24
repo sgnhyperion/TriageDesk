@@ -16,6 +16,7 @@ langgraph-checkpoint-postgres>=1.0  # HITL pause/resume
 
 # Auth
 pyjwt>=2.8                     # validate Supabase JWTs on protected routes
+cryptography>=43               # ES256/RS256 verification for Supabase JWKS (asymmetric keys)
 
 # Data / integrations
 supabase>=2.4                  # Supabase client (DB, storage, auth admin)

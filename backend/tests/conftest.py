@@ -37,9 +37,11 @@ def pytest_collection_modifyitems(config, items):
 
 @pytest.fixture(autouse=True)
 def _offline_env(monkeypatch):
-    # Deterministic + offline: no live LLM, no tracing uploads.
+    # Deterministic + offline: no live LLM, no tracing uploads, auth off unless a
+    # test opts in (test_auth sets SUPABASE_JWT_SECRET itself).
     for var in ("LLM_PROVIDER", "GEMINI_API_KEY", "ANTHROPIC_API_KEY",
-                "LANGCHAIN_API_KEY", "LANGSMITH_API_KEY"):
+                "LANGCHAIN_API_KEY", "LANGSMITH_API_KEY",
+                "SUPABASE_URL", "SUPABASE_JWKS_URL", "SUPABASE_JWT_SECRET"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("LANGCHAIN_TRACING_V2", "false")
     monkeypatch.setenv("LANGSMITH_TRACING", "false")
