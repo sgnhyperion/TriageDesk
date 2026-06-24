@@ -51,6 +51,19 @@ def get_pool() -> ConnectionPool:
     )
 
 
+def close_pool() -> None:
+    """Close the process-wide pool, if one was created.
+
+    Short-lived scripts (setup, seed) should call this before exiting so the
+    pool shuts its background threads down while the interpreter is still alive,
+    instead of letting the destructor fire too late during finalization (which
+    raises PythonFinalizationError on Python 3.14).
+    """
+    if get_pool.cache_info().currsize:
+        get_pool().close()
+        get_pool.cache_clear()
+
+
 def healthcheck() -> bool:
     """True if the database is reachable (used by tests / a /health probe)."""
     try:

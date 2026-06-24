@@ -21,24 +21,39 @@ frontend/    # Next.js app (Member C)
 docs/        # onboarding, project plan, demo script
 ```
 
-## Run the backend
-The brain works **with no API keys** (deterministic fallback) and lights up the real LLM the moment a
-key is configured — no code change. The data layer (tickets, tools, RAG) needs Postgres.
+## Run locally with Docker (recommended)
+Docker runs only the **database** (Postgres + pgvector); the backend and frontend run on your
+machine. The brain works **with no API keys** (deterministic fallback) and lights up the real LLM the
+moment a key is configured — no code change. The data layer (tickets, tools, RAG) needs Postgres.
+
+**Prerequisite:** Docker Desktop running (`docker info` succeeds).
+
 ```bash
+# 0. One-time Python setup
 python -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
+cp backend/.env.example backend/.env        # DATABASE_URL already points at the local Docker DB
 
-# 1. Database (Postgres + pgvector) — local dev:
-docker compose up -d
-cp backend/.env.example backend/.env        # DATABASE_URL already points at the local DB
-python backend/db/apply_schema.py           # create the schema
-python backend/db/seed.py                    # seed demo customers/orders/tickets
-python -c "from backend.rag import ingest; ingest.ingest_seed_kb()"   # index the seed KB (needs GEMINI_API_KEY)
+# 1. Database — start the container, then set it up in ONE command:
+docker compose up -d                        # Postgres + pgvector on localhost:5432
+python -m backend.scripts.setup_db          # apply schema + seed demo data + ingest KB
+#                                             (re-runnable; add --fresh to wipe & rebuild)
 
-# 2. API
-uvicorn backend.main:app --reload            # http://localhost:8000/docs
+# 2. API (Terminal 1)
+uvicorn backend.main:app --reload           # http://localhost:8000/docs
 ```
-> No Docker? Point `DATABASE_URL` at any Postgres+pgvector (e.g. a Supabase session-pooler URI) and run the same `apply_schema.py` / `seed.py`. With no reachable DB the API still boots and DB-backed tools degrade gracefully.
+
+`backend.scripts.setup_db` replaces running `apply_schema.py` / `seed.py` / the KB ingest by hand —
+it is idempotent (safe to re-run) and exits cleanly. The KB ingest step needs a Gemini key.
+
+> **Daily startup** (after the first time): just `docker compose up -d` + `uvicorn backend.main:app --reload`.
+> Skip `setup_db` unless you reset the DB. Data persists in a Docker volume between restarts.
+>
+> **No Docker?** Point `DATABASE_URL` at any Postgres+pgvector (e.g. a Supabase session-pooler URI)
+> and run `python -m backend.scripts.setup_db`. With no reachable DB the API still boots and DB-backed
+> tools degrade gracefully.
+>
+> **Stop everything:** Ctrl-C the servers, then `docker compose down` (add `-v` to also wipe the DB).
 
 Try it:
 ```bash
@@ -73,12 +88,15 @@ python -m backend.scripts.smoke
 ```
 
 ## Run the frontend
+In a second terminal (the backend should be running from the steps above):
 ```bash
 cd frontend
-npm install
-cp .env.local.example .env.local           # fill in Supabase + API URL
+cp .env.local.example .env.local           # first time only — sets API URL (+ optional Supabase)
+npm install                                 # first time only
 npm run dev                                 # http://localhost:3000
 ```
+> With no Supabase keys in `.env.local`, the UI auto-runs in **demo mode** (one-click sign-in +
+> fixture tickets), so you can click through the whole flow even without auth configured.
 
 ## Run tests
 ```bash
