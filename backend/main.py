@@ -6,6 +6,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.routes import router
+from backend.observability import setup_tracing
+
+setup_tracing()  # enables LangSmith tracing iff LANGSMITH_API_KEY is configured
 
 app = FastAPI(title="TriageDesk API", version="0.1.0")
 
