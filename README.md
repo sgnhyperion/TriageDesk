@@ -22,46 +22,27 @@ docs/        # onboarding, project plan, demo script
 ```
 
 ## Run locally with Docker (recommended)
-Docker runs only the **database** (Postgres + pgvector); the backend and frontend run on your
-machine. The brain works **with no API keys** (deterministic fallback) and lights up the real LLM the
-moment a key is configured — no code change. The data layer (tickets, tools, RAG) needs Postgres.
+**Prerequisite:** Docker Desktop running. Docker runs only the **database**; backend + frontend run
+on your machine.
 
-**Prerequisite:** Docker Desktop running (`docker info` succeeds).
-
+**Backend** — one command does everything (venv → deps → `.env` → Docker DB → fresh schema+seed+KB →
+live API). Terminal 1:
 ```bash
-# 0. One-time Python setup
-python -m venv .venv && source .venv/bin/activate
-pip install -r backend/requirements.txt
-cp backend/.env.example backend/.env        # DATABASE_URL already points at the local Docker DB
-
-# 1. Database — start the container, then set it up in ONE command:
-docker compose up -d                        # Postgres + pgvector on localhost:5432
-python -m backend.scripts.setup_db          # apply schema + seed demo data + ingest KB
-#                                             (re-runnable; add --fresh to wipe & rebuild)
-
-# 2. API (Terminal 1)
-uvicorn backend.main:app --reload           # http://localhost:8000/docs
+./run.sh                  # http://localhost:8000/docs   (./run.sh --keep-db to not wipe the DB)
 ```
 
-`backend.scripts.setup_db` replaces running `apply_schema.py` / `seed.py` / the KB ingest by hand —
-it is idempotent (safe to re-run) and exits cleanly. The KB ingest step needs a Gemini key.
-
-> **Daily startup** (after the first time): just `docker compose up -d` + `uvicorn backend.main:app --reload`.
-> Skip `setup_db` unless you reset the DB. Data persists in a Docker volume between restarts.
->
-> **No Docker?** Point `DATABASE_URL` at any Postgres+pgvector (e.g. a Supabase session-pooler URI)
-> and run `python -m backend.scripts.setup_db`. With no reachable DB the API still boots and DB-backed
-> tools degrade gracefully.
->
-> **Stop everything:** Ctrl-C the servers, then `docker compose down` (add `-v` to also wipe the DB).
-
-Try it:
+**Frontend** — Terminal 2:
 ```bash
-curl -X POST http://localhost:8000/tickets/TCK-1003/run        # brain runs, pauses for approval
-curl http://localhost:8000/tickets/TCK-1003/trace              # the brain's reasoning trace
-curl -X POST http://localhost:8000/tickets/TCK-1003/decision \
-     -H 'Content-Type: application/json' -d '{"action":"approve"}'   # human approves -> sends
+cd frontend && npm install && npm run dev          # http://localhost:3000
 ```
+
+That's it. `run.sh` is idempotent (safe to re-run) and needs a Gemini key for the KB-ingest step.
+
+> **Stop:** Ctrl-C the servers + `docker compose down`. **No Docker?** Point `DATABASE_URL` at any
+> Postgres+pgvector and run `python -m backend.scripts.setup_db`; with no DB the API still boots and
+> tools degrade gracefully. The individual steps `run.sh` automates are in
+> [`backend/scripts/setup_db.py`](backend/scripts/setup_db.py).
+
 
 ### Configure real mode (optional)
 ```bash
