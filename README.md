@@ -21,14 +21,40 @@ frontend/    # Next.js app (Member C)
 docs/        # onboarding, project plan, demo script
 ```
 
-## Run the backend
-Works **with no API keys** (deterministic fallback brain) and lights up the real LLM the moment a
-key is configured — no code change.
+## Run locally with Docker (recommended)
+Docker runs only the **database** (Postgres + pgvector); the backend and frontend run on your
+machine. The brain works **with no API keys** (deterministic fallback) and lights up the real LLM the
+moment a key is configured — no code change. The data layer (tickets, tools, RAG) needs Postgres.
+
+**Prerequisite:** Docker Desktop running (`docker info` succeeds).
+
 ```bash
+# 0. One-time Python setup
 python -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
-uvicorn backend.main:app --reload          # http://localhost:8000/docs
+cp backend/.env.example backend/.env        # DATABASE_URL already points at the local Docker DB
+
+# 1. Database — start the container, then set it up in ONE command:
+docker compose up -d                        # Postgres + pgvector on localhost:5432
+python -m backend.scripts.setup_db          # apply schema + seed demo data + ingest KB
+#                                             (re-runnable; add --fresh to wipe & rebuild)
+
+# 2. API (Terminal 1)
+uvicorn backend.main:app --reload           # http://localhost:8000/docs
 ```
+
+`backend.scripts.setup_db` replaces running `apply_schema.py` / `seed.py` / the KB ingest by hand —
+it is idempotent (safe to re-run) and exits cleanly. The KB ingest step needs a Gemini key.
+
+> **Daily startup** (after the first time): just `docker compose up -d` + `uvicorn backend.main:app --reload`.
+> Skip `setup_db` unless you reset the DB. Data persists in a Docker volume between restarts.
+>
+> **No Docker?** Point `DATABASE_URL` at any Postgres+pgvector (e.g. a Supabase session-pooler URI)
+> and run `python -m backend.scripts.setup_db`. With no reachable DB the API still boots and DB-backed
+> tools degrade gracefully.
+>
+> **Stop everything:** Ctrl-C the servers, then `docker compose down` (add `-v` to also wipe the DB).
+
 Try it:
 ```bash
 curl -X POST http://localhost:8000/tickets/TCK-1003/run        # brain runs, pauses for approval
@@ -62,26 +88,34 @@ python -m backend.scripts.smoke
 ```
 
 ## Run the frontend
+In a second terminal (the backend should be running from the steps above):
 ```bash
 cd frontend
-npm install
-cp .env.local.example .env.local           # fill in Supabase + API URL
+cp .env.local.example .env.local           # first time only — sets API URL (+ optional Supabase)
+npm install                                 # first time only
 npm run dev                                 # http://localhost:3000
 ```
+> With no Supabase keys in `.env.local`, the UI auto-runs in **demo mode** (one-click sign-in +
+> fixture tickets), so you can click through the whole flow even without auth configured.
 
-## Run tests (eval suite)
+## Run tests
 ```bash
-pytest backend/tests -q
+pytest backend/tests -q                                   # orchestration unit tests (offline)
+TRIAGEDESK_TEST_DB="$DATABASE_URL" pytest backend/tests backend/tools/tests backend/rag/tests -q   # full suite (needs DB)
 ```
 
 ## Status
-🟢 **Member A (backend brain) — implemented & verified.** Real governed supervisor brain +
-guardrails, 3 agents, LangGraph `StateGraph` with `interrupt()`/resume HITL on a Postgres
-checkpointer, FastAPI routes, Supabase JWT auth, LangSmith tracing, dynamic Gemini/Claude provider
-switching, and graceful LLM fallback. Verified live against Gemini, Claude, and a real Supabase
-database.
-🟡 **Member B (tools/RAG) & Member C (frontend/eval) — in progress.** The brain runs on stub tools
-until B's real tools are wired into `backend/tools/registry.py`; C builds against the live API.
+🟢 **Integrated and verified end-to-end.** All three slices are wired together and run as one system:
+governed LangGraph supervisor brain + guardrails + HITL (Postgres checkpointer) → 9 Postgres-backed
+tools → pgvector RAG → Resend email → analytics → Next.js UI with the reasoning-trace and approval
+panel. Verified live: the brain autonomously runs `lookup_customer → lookup_order → process_refund`
+on the seeded duplicate-charge ticket, pauses for human approval, and resumes — over real HTTP,
+against real Postgres, with the real LLM. **85 backend tests pass** (with the DB); the frontend
+builds clean.
+
+Provider/DB are swappable by config: `LLM_PROVIDER=gemini|anthropic`, `DATABASE_URL=local|Supabase`.
+Everything degrades gracefully — no key → deterministic brain, no DB → fast-fail tools, no Supabase
+→ frontend mock mode + open-auth dev mode.
 
 ## Ownership
 - **Member A** (Harsh): backend brain, LangGraph, HITL, API, auth, observability — `backend/{supervisor,graph,agents,api,auth,observability,llm,prompts}.py`
