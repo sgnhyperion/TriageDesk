@@ -117,7 +117,7 @@ def get_embeddings():
             "GEMINI_API_KEY is required for embeddings (Anthropic has no embeddings API)."
         )
     return GoogleGenerativeAIEmbeddings(
-        model=os.getenv("GEMINI_EMBED_MODEL", "text-embedding-004"),
+        model=os.getenv("GEMINI_EMBED_MODEL", "models/text-embedding-004"),
         google_api_key=key,
     )
 

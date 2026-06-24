@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from contracts.schemas import HumanAction, RouteDecision
 from backend import analytics, graph as graph_mod, store, supervisor
 from backend.agents import triage
-from backend.auth import AuthUser, get_current_user, require_admin
+from backend.auth import get_current_user, require_admin
 from backend.rag import ingest
 
 router = APIRouter()
@@ -179,21 +179,17 @@ def decide(ticket_id: str, req: DecisionRequest):
 
 @router.get("/kb/documents", dependencies=[Depends(require_admin)])
 def list_kb_documents():
-    return []  # TODO(Member B)
+    return ingest.list_kb_documents()
 
 
-@router.post("/kb/upload", status_code=201)
-async def upload_kb(
-    file: UploadFile = File(...),
-    title: str = Form(...),
-    user: AuthUser = Depends(require_admin),
-):
-    """Admin: upload a KB doc → chunk + embed + index (delegates to Member B's ingest)."""
-    contents = await file.read()
+@router.post("/kb/upload", status_code=201, dependencies=[Depends(require_admin)])
+async def upload_kb_document(file: UploadFile = File(...), title: str | None = Form(None)):
+    """Admin KB upload: file -> chunk -> embed -> index, searchable live."""
+    file_bytes = await file.read()
     try:
-        return ingest.ingest_document(title=title, file_bytes=contents, uploaded_by=user.id)
-    except NotImplementedError:
-        raise HTTPException(501, "KB ingestion not implemented yet (Member B)")
+        return ingest.save_and_ingest_upload(file.filename, file_bytes, title=title)
+    except Exception as exc:
+        raise HTTPException(400, f"KB ingest failed: {exc}")
 
 
 @router.get("/analytics", dependencies=[Depends(get_current_user)])

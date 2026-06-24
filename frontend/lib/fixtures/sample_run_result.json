@@ -1,0 +1,20 @@
+{
+  "ticket_id": "TCK-1001",
+  "route": "await_human",
+  "awaiting_action": "process_refund",
+  "draft": {
+    "body": "Hi! I looked into your account and confirmed a duplicate Pro charge on June 3 (order ORD-9002). I've queued a refund of $20.00 for that duplicate charge. You'll see it in 5-7 business days. Sorry for the trouble!",
+    "cited_chunk_ids": ["kb-refund-policy-1"],
+    "proposed_actions": ["process_refund", "send_email"]
+  },
+  "guardrail_result": {
+    "passed": true,
+    "pii_detected": false,
+    "policy_violations": [],
+    "hallucination_risk": false,
+    "redacted_body": null,
+    "notes": "Refund within policy threshold; grounded in order lookup."
+  },
+  "final_reply": null,
+  "step_count": 4
+}
