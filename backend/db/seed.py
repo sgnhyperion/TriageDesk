@@ -92,9 +92,12 @@ def _seed_customers() -> int:
 
 def _seed_orders() -> int:
     for oid, cust, cents, cur, status, charged_at, desc in ORDERS:
+        # Upsert amount/status so re-seeding RESTORES the demo state — e.g. the
+        # CUST-42 duplicate charge that a prior refund (demo or test) consumed.
         queries.execute(
             "insert into orders (id, customer_id, amount_cents, currency, status, charged_at, description) "
-            "values (%s,%s,%s,%s,%s,%s,%s) on conflict (id) do nothing",
+            "values (%s,%s,%s,%s,%s,%s,%s) "
+            "on conflict (id) do update set amount_cents = excluded.amount_cents, status = excluded.status",
             (oid, cust, cents, cur, status, charged_at, desc),
         )
     return len(ORDERS)
