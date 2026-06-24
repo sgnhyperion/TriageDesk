@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const session = data.session;
         if (session?.user && active) {
           setAuthToken(session.access_token);
-          const role = await fetchRole(session.user.id);
+          const role = await resolveRole(session.user);
           setUser({ email: session.user.email ?? "user", role });
         }
         // keep the api token in sync with future auth changes
@@ -71,14 +71,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  async function fetchRole(userId: string): Promise<Role> {
+  type WithMeta = {
+    id: string;
+    app_metadata?: Record<string, unknown>;
+    user_metadata?: Record<string, unknown>;
+  };
+
+  function roleFromMetadata(u: WithMeta): Role | null {
+    const r = (u.app_metadata?.role ?? u.user_metadata?.role) as string | undefined;
+    return r === "admin" || r === "agent" ? r : null;
+  }
+
+  // Prefer the role carried in the Supabase session (app_metadata/user_metadata)
+  // — set it in the dashboard and it works everywhere. Fall back to a profiles row.
+  async function resolveRole(u: WithMeta): Promise<Role> {
+    const fromMeta = roleFromMetadata(u);
+    if (fromMeta) return fromMeta;
     const sb = getSupabase();
     if (!sb) return "agent";
-    const { data } = await sb
-      .from("profiles")
-      .select("role")
-      .eq("id", userId)
-      .single();
+    const { data } = await sb.from("profiles").select("role").eq("id", u.id).single();
     return (data?.role as Role) ?? "agent";
   }
 
@@ -91,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (error) throw error;
     setAuthToken(data.session?.access_token ?? null);
-    const role = data.user ? await fetchRole(data.user.id) : "agent";
+    const role = data.user ? await resolveRole(data.user) : "agent";
     setUser({ email: data.user?.email ?? email, role });
   }
 
