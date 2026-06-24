@@ -98,14 +98,15 @@ def test_ticket_detail_reflects_run_state():
 
 
 def test_kb_upload_delegates_to_ingest():
-    # Dev mode => the dependency yields an admin, so the route runs and delegates
-    # to Member B's ingest stub, which is not implemented yet (clean 501).
+    # Dev mode => the admin dependency passes, so the route runs and delegates to
+    # Member B's real ingest. Offline (no embeddings/DB) ingest fails and the route
+    # surfaces it as a clean 400 — proving the route is reachable and wired, not 404/501.
     resp = client.post(
         "/kb/upload",
         files={"file": ("kb.txt", b"hello world", "text/plain")},
         data={"title": "Help doc"},
     )
-    assert resp.status_code == 501
+    assert resp.status_code == 400
 
 
 def test_kb_upload_requires_a_file():

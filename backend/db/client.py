@@ -31,12 +31,18 @@ def get_pool() -> ConnectionPool:
     """Lazily create one process-wide connection pool.
 
     Rows come back as dicts (dict_row) so callers get column-name access.
+
+    `connect_timeout` + the pool `timeout` keep an unreachable DB from blocking
+    a request for ~30s: a tool call fails fast, dispatch() turns it into an
+    `ok=False` ToolResult, and the brain degrades gracefully instead of hanging.
     """
+    connect_timeout = int(os.getenv("DB_CONNECT_TIMEOUT", "8"))
     return ConnectionPool(
         conninfo=get_dsn(),
         min_size=1,
         max_size=5,
-        kwargs={"row_factory": dict_row},
+        kwargs={"row_factory": dict_row, "connect_timeout": connect_timeout},
+        timeout=float(os.getenv("DB_POOL_TIMEOUT", str(connect_timeout))),
         open=True,
     )
 
