@@ -1,10 +1,35 @@
-// Admin: KB document upload + analytics dashboard. Owner: Member C.
-// TODO(Member C): admin-only route; upload form -> POST /kb/upload; dashboard from getAnalytics().
+"use client";
+// Admin: KB upload + analytics dashboard. Owner: Member C. Admin-gated.
+import { KbUpload } from "@/components/KbUpload";
+import { AnalyticsCards } from "@/components/AnalyticsCards";
+import { RequireAuth } from "@/components/RequireAuth";
+
+function Admin() {
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Admin</h1>
+        <p className="text-sm text-slate-500">
+          Knowledge base management and support analytics.
+        </p>
+      </div>
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Analytics</h2>
+        <AnalyticsCards />
+      </section>
+
+      <section>
+        <KbUpload />
+      </section>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   return (
-    <main className="p-10">
-      <h1 className="text-xl font-bold mb-2">Admin</h1>
-      <p className="text-gray-600">TODO(Member C): KB upload + analytics dashboard.</p>
-    </main>
+    <RequireAuth role="admin">
+      <Admin />
+    </RequireAuth>
   );
 }

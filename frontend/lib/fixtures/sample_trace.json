@@ -1,0 +1,34 @@
+[
+  {
+    "step": 1,
+    "tool": "lookup_customer",
+    "reason": "Need to confirm the customer's account and plan before acting on a billing complaint.",
+    "args": { "customer_id": "CUST-42" },
+    "result": { "name": "Jane Doe", "plan": "pro", "email": "jane@example.com" },
+    "ok": true
+  },
+  {
+    "step": 2,
+    "tool": "lookup_order",
+    "reason": "Check recent charges to verify the duplicate billing the customer described.",
+    "args": { "customer_id": "CUST-42" },
+    "result": { "duplicate_charge": true, "order_id": "ORD-9002", "amount_cents": 2000 },
+    "ok": true
+  },
+  {
+    "step": 3,
+    "tool": "retrieve_kb",
+    "reason": "Confirm the refund policy covers duplicate charges before promising a refund.",
+    "args": { "query": "duplicate charge refund policy" },
+    "result": { "has_grounding": true, "top_chunk": "kb-refund-policy-1" },
+    "ok": true
+  },
+  {
+    "step": 4,
+    "tool": "process_refund",
+    "reason": "Duplicate charge confirmed and within policy. Proposing a refund (requires human approval).",
+    "args": { "order_id": "ORD-9002", "amount_cents": 2000 },
+    "result": { "status": "awaiting_human_approval" },
+    "ok": true
+  }
+]
