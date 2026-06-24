@@ -1,17 +1,42 @@
-"""retrieve_kb tool — RAG over pgvector. Owner: Member B."""
-from contracts.schemas import RetrievedContext, SupportState, ToolName, ToolResult
+"""retrieve_kb tool — RAG over pgvector. Owner: Member B.
 
-GROUNDING_THRESHOLD = 0.70  # below this, brain should escalate (no hallucination)
+Embeds the query with Gemini, runs the match_kb_chunks() similarity function, and
+returns a RetrievedContext. The key guardrail: `has_grounding` is False when the
+top similarity is below GROUNDING_THRESHOLD — the signal for the brain to escalate
+instead of hallucinating an answer the KB doesn't support.
+"""
+from __future__ import annotations
+
+from contracts.schemas import RetrievedChunk, RetrievedContext, SupportState, ToolName, ToolResult
+from backend.db import queries
+from backend.rag.embed import embed_query
+
+GROUNDING_THRESHOLD = 0.70  # top score below this => no grounding => escalate
 
 
 def retrieve_kb(args: dict, state: SupportState) -> ToolResult:
-    """TODO(Member B): embed args['query'], call the `match_kb_chunks` SQL function,
-    build RetrievedContext, set has_grounding = (top score >= GROUNDING_THRESHOLD).
+    query = args.get("query") or f"{state.ticket_subject} {state.ticket_body}".strip()
+    match_count = int(args.get("match_count", 4))
 
-    Stub returns empty grounding.
-    """
-    ctx = RetrievedContext(query=args.get("query", state.ticket_subject),
-                           chunks=[], has_grounding=False)
-    return ToolResult(tool=ToolName.RETRIEVE_KB, ok=True,
-                      output={"stub": True, "has_grounding": ctx.has_grounding,
-                              "chunk_count": len(ctx.chunks)})
+    embedding = embed_query(query)
+    rows = queries.fetch_all(
+        "select chunk_id, document_title, content, score "
+        "from match_kb_chunks(%s::vector, %s)",
+        (_vector_literal(embedding), match_count))
+
+    chunks = [
+        RetrievedChunk(chunk_id=str(r["chunk_id"]), document_title=r["document_title"],
+                       content=r["content"], score=float(r["score"]))
+        for r in rows
+    ]
+    top_score = max((c.score for c in chunks), default=0.0)
+    has_grounding = top_score >= GROUNDING_THRESHOLD
+
+    ctx = RetrievedContext(query=query, chunks=chunks, has_grounding=has_grounding)
+    output = ctx.model_dump()
+    output["top_score"] = top_score
+    return ToolResult(tool=ToolName.RETRIEVE_KB, ok=True, output=output)
+
+
+def _vector_literal(vec: list[float]) -> str:
+    return "[" + ",".join(repr(float(x)) for x in vec) + "]"

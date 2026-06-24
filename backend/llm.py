@@ -26,13 +26,20 @@ def get_llm(temperature: float = 0.0):
 
 
 def get_embeddings():
-    """Return an embeddings client for RAG. Owner: Member B (uses this).
+    """Return a Gemini embeddings client for RAG (768-dim text-embedding-004).
 
-    TODO(Member A/B):
-        from langchain_google_genai import GoogleGenerativeAIEmbeddings
-        return GoogleGenerativeAIEmbeddings(
-            model=os.getenv("GEMINI_EMBED_MODEL", "text-embedding-004"),
-            google_api_key=os.getenv("GEMINI_API_KEY"),
-        )
+    Implemented by Member B (RAG depends on it). Kept here so the LLM provider
+    lives in one place, consistent with get_llm().
     """
-    raise NotImplementedError("TODO: wire up Gemini embeddings")
+    from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "GEMINI_API_KEY is not set — copy backend/.env.example to backend/.env "
+            "and fill it in (RAG/embeddings need it)."
+        )
+    return GoogleGenerativeAIEmbeddings(
+        model=os.getenv("GEMINI_EMBED_MODEL", "models/text-embedding-004"),
+        google_api_key=api_key,
+    )
