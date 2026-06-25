@@ -1,146 +1,258 @@
-# TriageDesk — 10-Minute Presentation Runbook
+# TriageDesk — Architecture
 
-> Follows the official structure exactly. 10 min presentation + 5 min Q&A.
-> **3 presenters.** Every section names who speaks. Practice to the clock.
+> An AI support desk that resolves tickets in seconds, with **a human approving every action
+> that touches money or the customer**. The design goal in one line: **speed *and* safety.**
 >
-> | # | Presenter | Slice |
-> |---|---|---|
-> | **P1** | Harsh Kumar (10116) | Member A — the Brain (LangGraph, supervisor, API) |
-> | **P2** | Aman Yadav (10055) | Member B — Data, Tools, RAG, email |
-> | **P3** | Harsh Kumar (10098) | Member C — Frontend, Eval, Demo |
+> A *governed supervisor brain* picks tools at runtime (not a fixed flowchart), loops until the
+> ticket is resolved, and **pauses for human approval** before any high-impact action. This doc
+> explains how the pieces fit together. For the talk-track version, see the presentation deck in
+> [`docs/presentation/`](presentation/).
 
 ---
 
-## 0:00–1:00 — Problem, user, why it matters  ·  **P3 speaks**
+## 1. System at a glance
 
-> "Support teams face a constant tension between **speed and safety**. A single AI bot is fast but
-> dangerous — it hallucinates answers, promises refunds it shouldn't, and leaks personal data. Pure
-> human handling is safe but slow and expensive. **Our users are Tier-1 support agents and admins.**
-> TriageDesk sits in the middle: an AI resolves tickets in seconds, but **a human approves every
-> action that touches money or the customer.** Speed *and* safety."
+Three slices, built against **frozen contracts** ([`contracts/`](../contracts/): Pydantic schemas,
+`schema.sql`, `openapi.yaml`) so they could be developed in parallel.
 
-- Show: the **inbox** with the 5 tickets (billing, bug, how-to, vague, out-of-scope) → "real support is wildly varied."
+```mermaid
+flowchart TB
+    subgraph FE["Frontend · Next.js (Member C)"]
+        UI["Inbox · reasoning-trace · approval panel · admin"]
+    end
 
----
+    subgraph BE["Backend · FastAPI"]
+        API["api/routes.py"]
+        subgraph BRAIN["The Brain (Member A)"]
+            GRAPH["graph.py — LangGraph StateGraph"]
+            SUP["supervisor.py — decision loop + guardrails"]
+            AG["agents/ — triage · resolution · qa"]
+            LLM["llm.py — Gemini | Claude factory"]
+        end
+        REG["tools/registry.py — 10 tools (Member B)"]
+        CKPT["checkpointer.py — HITL persistence"]
+    end
 
-## 1:00–2:00 — Why it needs a multi-agent system  ·  **P1 speaks**
+    PG[("Postgres — CRM · tickets · refunds")]
+    VEC[("pgvector — KB embeddings")]
+    MAIL["Resend — email"]
 
-> "Two reasons. **One — different jobs, different agents:** understanding a ticket, finding the
-> answer, writing the reply, and checking it for safety are *different skills with different failure
-> modes*, so we split them into specialized agents. **Two — a dynamic brain, not a fixed script:**
-> we have ~10 tools, and every ticket needs a different combination in a different order. You only
-> discover the next step *after* the last one — look up an order, *oh it's a duplicate*, now propose a
-> refund. A hard-coded flowchart would have to enumerate every path — intractable. So a **supervisor
-> brain picks tools at runtime**, governed by guardrails."
+    UI -->|HTTPS + Bearer JWT| API
+    API --> GRAPH
+    GRAPH <--> SUP
+    SUP --> AG
+    AG --> LLM
+    SUP --> REG
+    GRAPH --> CKPT
+    REG --> PG
+    REG --> VEC
+    REG --> MAIL
+    CKPT --> PG
+```
 
----
-
-## 2:00–4:00 — Architecture: agents, tools, state, routing, handoffs  ·  **P1 leads, P2 covers tools/data**
-
-**P1 (2:00–3:10) — the brain & the graph:**
-> "Four agents. A **Triage** agent classifies the ticket. The **Supervisor** is the brain — it reads
-> the state, emits one structured **`Decision`** (which tool + why), runs it, and loops. A
-> **Resolution** agent drafts the reply; a **QA** agent checks it for PII/policy/hallucination.
->
-> Everything flows through one object — **`SupportState`** — and its **`scratchpad`**, the brain's
-> working memory: the ordered list of tool results it reasons over before each decision.
->
-> It's a real **LangGraph** graph: `START → supervisor → (continue → tools → loop)`, or
-> `(await_human → interrupt → wait)`, or `(done/escalate/refuse → END)`. The pause is a true
-> **`interrupt()`** persisted by a **Postgres checkpointer** keyed by ticket id — so approval can
-> arrive in a *separate* HTTP request, even after a restart, and resume the exact run."
-
-**P2 (3:10–4:00) — tools, data, RAG, handoffs:**
-> "The brain acts on **10 tools**, all returning a structured **`ToolResult`** — CRM lookups,
-> past-ticket search, bug filing, refund, draft, email. They're backed by **real Postgres**. For
-> grounding we use **RAG over pgvector**: help docs are chunked, embedded to 768-dim vectors, and
-> searched by meaning. Handoffs are all **Pydantic** — `Decision`, `ToolResult`, `Classification` —
-> so the agents fit together by contract. Two things are mocked on purpose: inbound email (a 'new
-> ticket' form) and the refund (writes a row, no Stripe) — the approval flow is identical either way."
-
----
-
-## 4:00–7:00 — Working demo  ·  **P3 drives the UI; ticket owner narrates**
-
-> Pre-warm before stage: run TCK-1003 once so the first LLM call isn't cold.
-> One person (P3) clicks; the owner of each ticket talks over it.
-
-**(4:00–5:15) TCK-1001 "Charged twice" — HITL hero · P1 narrates**
-- Open → **▶ Run agent**. Trace: `lookup_customer → lookup_order` **(duplicate found)** `→ process_refund`.
-- **Pauses.** "It discovered the refund only *after* the lookup. And it won't move money without a human." → **Approve refund** → continues to draft + send.
-
-**(5:15–6:00) TCK-1002 "App crashes on PDF export" — RAG, no refund · P2 narrates**
-- Run → `search_past_tickets` + `retrieve_kb` find the known v3.2 fix → grounded reply, **no refund**.
-- "Backed by real Postgres + a pgvector knowledge base. A bug isn't a refund — different tools."
-
-**(6:00–6:30) TCK-1005 "Write my essay" — guardrail · P3 narrates**
-- Run → brain **refuses politely**, zero tools run. "Out-of-scope is refused, not answered."
-
-**(6:30–7:00) Admin · P3 narrates**
-- Switch to admin → **Analytics** cards → **upload a KB doc** → re-run a related ticket, now cites it.
-- "Agents are blocked from /admin — role-gated."
+| Slice | Where | Owner |
+|---|---|---|
+| **Brain + API** | `backend/{supervisor,graph,agents,api,auth,llm,prompts,observability}.py` | Member A |
+| **Data + Tools + RAG** | `backend/{tools,rag,integrations,db}/` | Member B |
+| **Frontend + Eval** | `frontend/`, `backend/tests/` | Member C |
 
 ---
 
-## 7:00–8:30 — Evaluation, guardrails, debugging, limitations  ·  **P3 speaks (P1 on guardrails)**
+## 2. The agents — four, with distinct jobs
 
-**P3 — evaluation & debugging:**
-> "We have **11 evaluation scenarios** — `pytest backend/tests/test_eval.py`, all green. Each asserts
-> on the brain's **tool path** and **final outcome** for a ticket type. They're **deterministic**: the
-> decider is injectable, so we test the loop, guardrails, and routing — not the LLM's random sampling —
-> and they run with no API key in under a second. **92 tests pass overall.** For debugging we use
-> **LangSmith**: every LLM call and graph step is traced, which is how we caught issues like the brain
-> looping or picking a wrong tool."
+Understanding a ticket, finding the answer, writing the reply, and checking it for safety are
+*different skills with different failure modes*, so each is its own agent.
 
-**P1 — guardrails (the governance):**
-> "Eight guardrails keep the brain safe: **out-of-scope → refuse**; **low confidence → escalate**;
-> **critical severity → escalate**; **step budget of 8 → escalate** (no infinite loops); **grounding
-> floor** (KB match below threshold → escalate, no hallucination); **QA/PII pass** on every draft;
-> an **allow-list** (the brain may only emit a valid tool name); and **mandatory human approval**
-> before refund and email."
+| Agent | File | Job | Structured output |
+|---|---|---|---|
+| **Triage** | [`agents/triage.py`](../backend/agents/triage.py) | classify the ticket | `Classification` |
+| **Supervisor** | [`supervisor.py`](../backend/supervisor.py) | **the brain** — pick the next tool each step | `Decision` |
+| **Resolution** | [`agents/resolution.py`](../backend/agents/resolution.py) | draft the customer reply | `DraftReply` |
+| **QA** | [`agents/qa_review.py`](../backend/agents/qa_review.py) | check PII / policy / hallucination | `GuardrailResult` |
 
-**Limitations (be honest — evaluators reward it):**
-> "Refund and inbound email are mocked; the resume path has one reconciliation TODO; RAG is
-> single-vector (no re-ranker yet); and the trace is shown after the run, not streamed live."
+**Key point — the supervisor picks *tools*, not agents.** Triage runs once before the loop;
+Resolution runs when the brain chooses the `draft_reply` tool; QA runs automatically right after
+every draft. The LLM has freedom over *which tool*; Python controls *where the agents plug in*.
 
 ---
 
-## 8:30–10:00 — Individual contributions  ·  **each speaks ~30s**
+## 3. Shared state — `SupportState` + the scratchpad
 
-**P1 — Harsh Kumar (10116), Member A:**
-> "I built the brain: the supervisor loop and guardrails, the 3 LLM agents, the LangGraph graph with
-> the Postgres-checkpointer HITL, the provider-swappable LLM factory (Gemini *or* Claude), auth, and
-> the FastAPI surface."
+One object flows through every step ([`contracts/schemas.py`](../contracts/schemas.py)). Its
+**`scratchpad`** is the brain's working memory: the ordered list of `ToolResult`s it reads before
+each decision — that's how it "remembers" the duplicate charge it just found.
 
-**P2 — Aman Yadav (10055), Member B:**
-> "I built everything the brain acts on: the Postgres schema + seed data, the 10 tools, the RAG
-> pipeline (embeddings → pgvector → retrieve with a grounding threshold), live KB upload, Resend
-> email, the refund mock, the audit log, and the analytics queries."
+```
+SupportState
+├─ ticket_id / subject / body / customer_id      ← input
+├─ classification        (Classification)        ← triage output
+├─ scratchpad: [ToolResult]   ◀── the brain's working memory
+├─ decision              (Decision)              ← most recent tool choice
+├─ draft / guardrail_result                      ← reply being built + QA verdict
+├─ route                 (CONTINUE | AWAIT_HUMAN | DONE | ESCALATE | REFUSE)
+├─ step_count / max_steps=8                       ← step-budget guardrail
+├─ awaiting_action / human_decision               ← the HITL channel
+└─ final_reply / escalated / audit_log            ← outcomes + trail
+```
 
-**P3 — Harsh Kumar (10098), Member C:**
-> "I built the product: the Next.js UI, the reasoning-trace view, the human-approval panel, the admin
-> screens, demo mode, and the 11-scenario evaluation suite and demo."
+Every handoff between agents is a **Pydantic** model (`Decision`, `ToolResult`, `Classification`),
+so the agents fit together by contract — and because `Decision.next_tool` is a `ToolName` **enum**,
+an invalid tool name is rejected at parse time.
 
 ---
 
-## Q&A (10:00–15:00) — likely questions, who answers
+## 4. The LangGraph graph
 
-| Question | Lead |
+The loop is a real `StateGraph` ([`graph.py`](../backend/graph.py)). Conditional edges branch on
+`state.route` — that's the routing requirement.
+
+```mermaid
+stateDiagram-v2
+    [*] --> supervisor
+    supervisor --> tools: continue
+    tools --> supervisor: loop
+    supervisor --> high_impact: await_human
+    high_impact --> supervisor: approved (refund)
+    high_impact --> [*]: sent / rejected
+    supervisor --> [*]: done / escalate / refuse
+
+    note right of high_impact
+        interrupt() — PAUSE here
+        state persisted by checkpointer
+    end note
+```
+
+- **supervisor** — runs the decision policy + guardrails, sets `route`.
+- **tools** — runs one tool, appends a `ToolResult`, runs QA after a draft.
+- **high_impact** — pauses for human approval via `interrupt()`, then executes or escalates.
+
+The graph reuses the same decision and guardrail functions from `supervisor.py`, so there's a
+single source of truth — the graph only adds structure + the real interrupt/resume mechanics.
+
+---
+
+## 5. Human-in-the-loop — how the pause survives two requests
+
+High-impact tools (`process_refund`, `send_email`) **must** have human approval. The pause is a
+true LangGraph `interrupt()`, persisted by a **Postgres checkpointer** keyed by
+`thread_id = ticket_id` — so approval can arrive in a *separate* HTTP request, even after a restart.
+
+```mermaid
+sequenceDiagram
+    participant UI as Frontend
+    participant API as FastAPI
+    participant G as LangGraph
+    participant DB as Postgres checkpointer
+
+    UI->>API: POST /tickets/{id}/run
+    API->>G: invoke(state)
+    G->>G: lookup_customer → lookup_order (duplicate!)
+    G->>G: decide process_refund (high-impact)
+    G->>DB: interrupt() — persist paused state
+    API-->>UI: { route: "awaiting_human" }
+
+    Note over UI,DB: minutes later — possibly after a restart
+
+    UI->>API: POST /tickets/{id}/decision { approve }
+    API->>G: invoke(Command(resume=...))
+    G->>DB: reload checkpoint by thread_id
+    G->>G: process_refund → draft → (pause to send) → send_email
+    API-->>UI: { route: "done", final_reply }
+```
+
+The checkpointer is Postgres when `DATABASE_URL` is set (survives restarts; this is what creates the
+`checkpoint_*` tables), otherwise an in-memory saver so the skeleton and tests still run HITL.
+
+---
+
+## 6. Tools, data, and RAG
+
+The brain acts on **10 tools** ([`tools/registry.py`](../backend/tools/registry.py)), all sharing
+one signature `fn(args, state) -> ToolResult` and dispatched through one function that catches
+errors so a tool can never crash the brain. They're backed by **real Postgres**.
+
+| Tool | What it does | Impact |
+|---|---|---|
+| `lookup_customer` · `lookup_order` · `check_subscription_status` | CRM reads; `lookup_order` **detects duplicate charges** | read |
+| `search_past_tickets` | full-text search over resolved tickets | read |
+| `retrieve_kb` | **RAG over pgvector** + grounding check | read |
+| `request_more_info` · `create_bug_report` · `draft_reply` | ask / file / write reply | low |
+| `process_refund` | **mock** refund (DB row + audit, no Stripe) | **HIGH → HITL** |
+| `send_email` | **real** outbound email (Resend) | **HIGH → HITL** |
+
+**RAG pipeline** ([`backend/rag/`](../backend/rag/)): help docs are chunked, embedded to **768-dim**
+vectors, and searched by meaning.
+
+```mermaid
+flowchart LR
+    DOC["KB doc (admin upload)"] --> CHUNK[chunk] --> EMB["embed · 768-dim"] --> STORE[("pgvector")]
+    Q["ticket question"] --> QEMB[embed] --> MATCH["match_kb_chunks()"]
+    STORE --> MATCH
+    MATCH --> GATE{"top score ≥ threshold?"}
+    GATE -->|yes| GROUND["grounded reply"]
+    GATE -->|no| ESC["escalate — no hallucination"]
+```
+
+Two things are mocked on purpose: inbound email (a "new ticket" form) and the refund. The approval
+flow is identical either way.
+
+---
+
+## 7. Guardrails — the governance
+
+Eight deterministic checks wrap the LLM ([`supervisor.py`](../backend/supervisor.py)):
+
+| Guardrail | Effect |
 |---|---|
-| Why a dynamic brain, not a fixed pipeline? | P1 |
-| How does the pause survive two HTTP requests? | P1 |
-| How do you stop hallucination? | P2 |
-| Why pgvector over a dedicated vector DB? | P2 |
-| How do you test a non-deterministic LLM? | P3 |
-| What's mocked and why? | P2 |
-| What stops infinite loops / bad tools? | P1 |
+| Out-of-scope | → refuse |
+| Low confidence | → escalate |
+| Critical severity | → escalate |
+| Step budget = 8 | → escalate (no infinite loops) |
+| Grounding floor (KB below threshold) | → escalate (no hallucination) |
+| QA / PII pass on every draft | → redact if possible, else escalate |
+| Allow-list (`ToolName` enum) | → only a valid tool name |
+| **Human approval** | → before refund &amp; email |
 
 ---
 
-## Pre-flight checklist (before the slot)
-- [ ] `./run.sh` (backend up) + `cd frontend && npm run dev` (frontend up).
-- [ ] Inbox shows TCK-1001..1005. Pre-warm: run TCK-1003 once.
-- [ ] Logged in as **agent**; know the **admin** login for the admin step.
-- [ ] Fallback ready: if the live LLM hiccups, demo mode (amber banner, fixtures) clicks through the same flow.
-- [ ] Screenshots/GIF of each step saved as a last resort.
-- [ ] One laptop drives; rehearsed once end-to-end to the clock.
+## 8. Evaluation & observability
+
+- **11 evaluation scenarios** ([`backend/tests/test_eval.py`](../backend/tests/test_eval.py)) — each
+  asserts on the brain's **tool path** and **final outcome** for a ticket type. They're
+  **deterministic** (the decider is injectable), so they test the loop, guardrails, and routing —
+  not the LLM's random sampling — and run with no API key in under a second.
+- **92 tests pass** overall across orchestration, tools, RAG, auth, and API.
+- **LangSmith** traces every LLM call and graph step (no-op without a key) — how we caught issues
+  like the brain looping or picking a wrong tool.
+
+---
+
+## 9. End to end — the duplicate-charge ticket
+
+```mermaid
+flowchart LR
+    A["lookup_customer"] --> B["lookup_order<br/>(duplicate found)"]
+    B --> C{{"process_refund<br/>⏸ human approval"}}
+    C -->|approved| D["draft_reply"]
+    D --> E["QA pass"]
+    E --> F{{"send_email<br/>⏸ human approval"}}
+    F -->|approved| G["done · final_reply"]
+
+    style C fill:#3a2a05,stroke:#F5A524,color:#F5A524
+    style F fill:#3a2a05,stroke:#F5A524,color:#F5A524
+```
+
+The brain discovered the refund **only after** the lookup (dynamic, not scripted) and **moved no
+money without a human** — speed *and* safety, the whole thesis.
+
+---
+
+## Provider & infra notes
+
+- **LLM is swappable** by one env var: `LLM_PROVIDER=gemini|anthropic` ([`llm.py`](../backend/llm.py)).
+  Quota/outage degrades gracefully — the brain falls back to deterministic behavior instead of crashing.
+- **Auth** ([`auth.py`](../backend/auth.py)): Supabase JWT (JWKS/ES256 or HS256), or open dev mode
+  with no keys; role (`admin`/`agent`) gates the `/kb/*` routes.
+- **Data model** ([`contracts/schema.sql`](../contracts/schema.sql)): customers, orders,
+  subscriptions, tickets, messages, bug_reports, refunds, kb_documents, kb_chunks, audit_log, plus
+  the `match_kb_chunks()` function and `vector` extension.
