@@ -1,0 +1,760 @@
+<title>TriageDesk — Presentation</title>
+
+<style>
+  :root {
+    --ink: #0E1419;
+    --surface: #161E26;
+    --surface-2: #1E2A35;
+    --text: #E6EDF3;
+    --muted: #8295A4;
+    --faint: #546573;
+    --line: #283845;
+    --cyan: #34D5C5;
+    --cyan-dim: rgba(52, 213, 197, 0.13);
+    --amber: #F5A524;
+    --amber-dim: rgba(245, 165, 36, 0.13);
+    --rose: #F2789B;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Code", Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--sans);
+    overflow: hidden;
+  }
+
+  body {
+    background:
+      radial-gradient(1100px 700px at 78% -8%, rgba(52, 213, 197, 0.08), transparent 60%),
+      radial-gradient(900px 600px at 12% 110%, rgba(245, 165, 36, 0.06), transparent 55%),
+      var(--ink);
+  }
+
+  /* ── progress bar ───────────────────────────────────── */
+  .progress {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--line);
+    z-index: 50;
+  }
+  .progress > span {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, var(--cyan), var(--amber));
+    transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* ── deck / slides ──────────────────────────────────── */
+  .deck {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(28px, 5vw, 80px);
+    padding-bottom: clamp(72px, 9vh, 110px);
+  }
+
+  .slide {
+    position: absolute;
+    width: min(1180px, 100%);
+    max-height: 100%;
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.42s ease, transform 0.42s ease;
+    pointer-events: none;
+  }
+  .slide.active {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin: 0 0 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .eyebrow .num { color: var(--faint); }
+  .eyebrow .who {
+    margin-left: auto;
+    color: var(--amber);
+    border: 1px solid rgba(245, 165, 36, 0.35);
+    border-radius: 999px;
+    padding: 3px 11px;
+    letter-spacing: 0.12em;
+  }
+
+  h1.title {
+    font-size: clamp(2.6rem, 8vw, 6.4rem);
+    line-height: 0.94;
+    letter-spacing: -0.03em;
+    font-weight: 800;
+    margin: 0;
+  }
+  h2 {
+    font-size: clamp(1.7rem, 3.6vw, 3rem);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    font-weight: 750;
+    margin: 0 0 26px;
+    max-width: 18ch;
+  }
+  h2 .hl { color: var(--cyan); }
+  h2 .hl-amber { color: var(--amber); }
+
+  p.lede { font-size: clamp(1.05rem, 1.7vw, 1.4rem); color: #C3D0DA; line-height: 1.5; margin: 0; max-width: 60ch; }
+  .muted { color: var(--muted); }
+  .mono { font-family: var(--mono); }
+
+  /* ── cover ──────────────────────────────────────────── */
+  .cover .kicker {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 28px;
+  }
+  .cover .thesis {
+    margin: 30px 0 0;
+    font-size: clamp(1.3rem, 2.6vw, 2.1rem);
+    font-weight: 600;
+    color: var(--text);
+  }
+  .cover .thesis b { color: var(--cyan); }
+  .cover .thesis b.h { color: var(--amber); }
+  .cover .sub { margin: 22px 0 0; max-width: 54ch; }
+  .team {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 40px;
+  }
+  .team .member {
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    color: #C3D0DA;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 9px 14px;
+  }
+  .team .member b { color: var(--text); font-weight: 700; }
+  .team .member span { color: var(--faint); }
+
+  /* ── generic layout helpers ─────────────────────────── */
+  .cols { display: grid; gap: 18px; }
+  .cols.two { grid-template-columns: 1fr 1fr; }
+  .cols.three { grid-template-columns: repeat(3, 1fr); }
+  .cols.four { grid-template-columns: repeat(4, 1fr); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px 20px 18px;
+  }
+  .card h3 {
+    margin: 0 0 8px;
+    font-size: 1.06rem;
+    letter-spacing: -0.01em;
+  }
+  .card p { margin: 0; color: var(--muted); font-size: 0.92rem; line-height: 1.45; }
+  .card .tag {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    display: block;
+    margin-bottom: 12px;
+  }
+  .card.amber { border-color: rgba(245, 165, 36, 0.4); background: linear-gradient(180deg, var(--amber-dim), transparent); }
+  .card.amber .tag { color: var(--amber); }
+  .card.cyan { border-color: rgba(52, 213, 197, 0.35); background: linear-gradient(180deg, var(--cyan-dim), transparent); }
+
+  .big-reason {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 22px;
+    align-items: start;
+    margin-bottom: 22px;
+  }
+  .big-reason .n {
+    font-family: var(--mono);
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: var(--cyan);
+    line-height: 1;
+  }
+  .big-reason h3 { margin: 4px 0 8px; font-size: 1.45rem; letter-spacing: -0.01em; }
+  .big-reason p { margin: 0; color: var(--muted); font-size: 1.02rem; line-height: 1.5; max-width: 62ch; }
+
+  /* ── tool-path motif (the signature element) ────────── */
+  .toolpath {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+  }
+  .node {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 12px;
+    white-space: nowrap;
+    color: #C3D0DA;
+  }
+  .node.read { border-color: rgba(52, 213, 197, 0.4); color: var(--cyan); }
+  .node.gate {
+    border-color: var(--amber);
+    color: var(--amber);
+    background: var(--amber-dim);
+    font-weight: 600;
+  }
+  .arrow { color: var(--faint); }
+
+  .gate-anim .node.gate { position: relative; }
+  .gate-anim .node.gate::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 11px;
+    border: 1px solid var(--amber);
+    opacity: 0;
+    animation: pulse 2.2s ease-out infinite;
+  }
+  @keyframes pulse {
+    0% { opacity: 0.7; transform: scale(1); }
+    70% { opacity: 0; transform: scale(1.12); }
+    100% { opacity: 0; }
+  }
+
+  /* ── graph topology ─────────────────────────────────── */
+  .graph {
+    font-family: var(--mono);
+    font-size: clamp(0.72rem, 1.2vw, 0.95rem);
+    line-height: 1.85;
+    color: #C3D0DA;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px 24px;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .graph b { color: var(--cyan); font-weight: 700; }
+  .graph .g-amber { color: var(--amber); font-weight: 700; }
+  .graph .g-end { color: var(--rose); }
+
+  /* ── lists ──────────────────────────────────────────── */
+  ul.clean { list-style: none; padding: 0; margin: 0; }
+  ul.clean li {
+    padding: 9px 0 9px 26px;
+    position: relative;
+    color: #C3D0DA;
+    line-height: 1.45;
+    border-bottom: 1px solid var(--line);
+  }
+  ul.clean li:last-child { border-bottom: none; }
+  ul.clean li::before {
+    content: "›";
+    position: absolute;
+    left: 4px;
+    color: var(--cyan);
+    font-family: var(--mono);
+  }
+  ul.clean li b { color: var(--text); }
+
+  .guard-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .guard {
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 0.92rem;
+  }
+  .guard .k { font-family: var(--mono); color: var(--text); font-weight: 600; white-space: nowrap; }
+  .guard .v { color: var(--muted); }
+  .guard.h { border-color: rgba(245, 165, 36, 0.4); }
+  .guard.h .k { color: var(--amber); }
+
+  .stat-row { display: flex; gap: 38px; flex-wrap: wrap; margin: 6px 0 26px; }
+  .stat .n { font-size: clamp(2.4rem, 5vw, 3.6rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+  .stat .n.cyan { color: var(--cyan); }
+  .stat .n.amber { color: var(--amber); }
+  .stat .l { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-top: 8px; }
+
+  /* demo ticket cards */
+  .demo-card { display: flex; flex-direction: column; gap: 12px; }
+  .demo-card .id { font-family: var(--mono); font-size: 0.72rem; color: var(--faint); letter-spacing: 0.1em; }
+  .demo-card h3 { margin: 0; font-size: 1.05rem; }
+  .demo-card .note { color: var(--muted); font-size: 0.86rem; margin: 0; line-height: 1.4; }
+
+  .qa-list { display: grid; grid-template-columns: 1fr auto; gap: 0; }
+  .qa-list .q { padding: 10px 0; border-bottom: 1px solid var(--line); color: #C3D0DA; }
+  .qa-list .a { padding: 10px 0; border-bottom: 1px solid var(--line); font-family: var(--mono); color: var(--amber); text-align: right; padding-left: 18px; }
+
+  /* ── bottom bar ─────────────────────────────────────── */
+  .bar {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    height: clamp(56px, 7vh, 70px);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 0 clamp(20px, 4vw, 48px);
+    background: linear-gradient(0deg, var(--ink), transparent);
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--muted);
+    z-index: 40;
+  }
+  .bar .brand { color: var(--text); font-weight: 700; letter-spacing: 0.04em; }
+  .bar .brand b { color: var(--cyan); }
+  .bar .band { color: var(--amber); }
+  .bar .right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+  .bar .idx { color: #C3D0DA; }
+  .bar .hint { color: var(--faint); }
+  .bar kbd {
+    font-family: var(--mono);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 1px 6px;
+    color: #C3D0DA;
+    font-size: 0.7rem;
+  }
+  .navbtn {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 8px;
+    width: 30px; height: 30px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    line-height: 1;
+  }
+  .navbtn:hover { border-color: var(--cyan); color: var(--cyan); }
+  .navbtn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+  /* ── speaker notes drawer ───────────────────────────── */
+  .notes {
+    position: fixed;
+    left: 0; right: 0;
+    bottom: clamp(56px, 7vh, 70px);
+    background: var(--surface);
+    border-top: 2px solid var(--amber);
+    padding: 18px clamp(20px, 4vw, 48px);
+    transform: translateY(120%);
+    transition: transform 0.35s ease;
+    z-index: 39;
+    max-height: 38vh;
+    overflow-y: auto;
+  }
+  .notes.open { transform: none; }
+  .notes .label {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin: 0 0 8px;
+  }
+  .notes .script { color: #D5E0E8; line-height: 1.55; font-size: 0.98rem; margin: 0; max-width: 90ch; }
+
+  @media (max-width: 760px) {
+    .cols.two, .cols.three, .cols.four, .guard-grid { grid-template-columns: 1fr; }
+    h2 { max-width: none; }
+    .bar .hint { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .slide { transition: opacity 0.2s; transform: none; }
+    .gate-anim .node.gate::after { animation: none; }
+    .progress > span { transition: none; }
+  }
+</style>
+
+<div class="progress"><span id="progressBar"></span></div>
+
+<div class="deck" id="deck">
+
+  <!-- 1 · COVER -->
+  <section class="slide cover" data-band="" data-who=""
+    data-notes="(P3 opens, or whoever holds the clicker.) Welcome — this is TriageDesk, our multi-agent AI support desk. The whole idea fits in two words: speed and safety. An AI resolves tickets in seconds, but a human approves anything that touches money or the customer. I'll hand to the team as we go.">
+    <p class="kicker">Multi-Agent Orchestration · Capstone</p>
+    <h1 class="title">TriageDesk</h1>
+    <p class="thesis"><b>Speed</b> and <b class="h">safety.</b></p>
+    <p class="sub lede">An AI support desk that resolves customer tickets in seconds — and asks a human before it ever touches money or the customer.</p>
+    <div class="team">
+      <span class="member"><b>Harsh Kumar</b> <span>10116 · Member A — the Brain</span></span>
+      <span class="member"><b>Aman Yadav</b> <span>10055 · Member B — Data · Tools · RAG</span></span>
+      <span class="member"><b>Harsh Kumar</b> <span>10098 · Member C — Frontend · Eval</span></span>
+    </div>
+  </section>
+
+  <!-- 2 · PROBLEM -->
+  <section class="slide" data-band="0:00–1:00" data-who="P3"
+    data-notes="Support teams face a constant tension between speed and safety. A single AI bot is fast but dangerous — it hallucinates answers, promises refunds it shouldn't, and leaks personal data. Pure human handling is safe but slow and expensive. Our users are Tier-1 support agents and admins. TriageDesk sits in the middle: an AI resolves tickets in seconds, but a human approves every action that touches money or the customer. Speed AND safety.">
+    <p class="eyebrow"><span class="num">02</span> The problem <span class="who">P3</span></p>
+    <h2>One bot is fast but <span class="hl-amber">dangerous</span>. Humans are safe but <span class="hl-amber">slow</span>.</h2>
+    <div class="cols three">
+      <div class="card">
+        <span class="tag">AI alone</span>
+        <p>Fast — but hallucinates answers, promises refunds it shouldn't, and leaks personal data.</p>
+      </div>
+      <div class="card">
+        <span class="tag">Humans alone</span>
+        <p>Safe — but slow and expensive. Every ticket waits on a person.</p>
+      </div>
+      <div class="card cyan">
+        <span class="tag">TriageDesk</span>
+        <p>AI resolves in seconds; a human approves anything touching money or the customer.</p>
+      </div>
+    </div>
+    <p class="lede" style="margin-top:24px">Users: <b style="color:var(--text)">Tier-1 support agents &amp; admins</b>. Real support is wildly varied — billing, bugs, how-tos, vague asks, out-of-scope.</p>
+  </section>
+
+  <!-- 3 · WHY MULTI-AGENT -->
+  <section class="slide" data-band="1:00–2:00" data-who="P1"
+    data-notes="Two reasons. One — different jobs, different agents: understanding a ticket, finding the answer, writing the reply, and checking it for safety are different skills with different failure modes, so we split them into specialized agents. Two — a dynamic brain, not a fixed script: we have about ten tools, and every ticket needs a different combination in a different order. You only discover the next step after the last one — look up an order, oh it's a duplicate, now propose a refund. A hard-coded flowchart would have to enumerate every path — intractable. So a supervisor brain picks tools at runtime, governed by guardrails.">
+    <p class="eyebrow"><span class="num">03</span> Why it needs multiple agents <span class="who">P1</span></p>
+    <div class="big-reason">
+      <div class="n">01</div>
+      <div>
+        <h3>Different jobs → different agents</h3>
+        <p>Understanding a ticket, finding the answer, writing the reply, and checking it for safety are different skills with different failure modes. So we split them into specialized agents.</p>
+      </div>
+    </div>
+    <div class="big-reason">
+      <div class="n">02</div>
+      <div>
+        <h3>A dynamic brain, not a fixed script</h3>
+        <p>~10 tools; every ticket needs a different combination in a different order. You only learn the next step <i>after</i> the last — look up an order, <span style="color:var(--amber)">oh it's a duplicate</span>, now propose a refund. A flowchart would enumerate every path — intractable. A <b style="color:var(--cyan)">supervisor brain picks tools at runtime</b>, governed by guardrails.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · ARCHITECTURE: agents + state -->
+  <section class="slide" data-band="2:00–3:10" data-who="P1"
+    data-notes="Four agents. A Triage agent classifies the ticket. The Supervisor is the brain — it reads the state, emits one structured Decision (which tool plus why), runs it, and loops. A Resolution agent drafts the reply; a QA agent checks it for PII, policy, and hallucination. Everything flows through one object — SupportState — and its scratchpad, the brain's working memory: the ordered list of tool results it reasons over before each decision. The handoffs are all Pydantic — Decision, ToolResult, Classification — so the agents fit together by contract.">
+    <p class="eyebrow"><span class="num">04</span> Architecture · four agents, one state <span class="who">P1</span></p>
+    <h2>Four agents. One <span class="hl">shared state.</span></h2>
+    <div class="cols four">
+      <div class="card"><span class="tag">classify</span><h3>Triage</h3><p>Category, severity, sentiment, in-scope, confidence.</p></div>
+      <div class="card cyan"><span class="tag">the brain</span><h3>Supervisor</h3><p>Reads state → emits one <span class="mono">Decision</span> (tool + why) → loops.</p></div>
+      <div class="card"><span class="tag">draft</span><h3>Resolution</h3><p>Writes a grounded customer reply.</p></div>
+      <div class="card amber"><span class="tag">check</span><h3>QA</h3><p>PII, policy, hallucination — before any human sees it.</p></div>
+    </div>
+    <div class="cols two" style="margin-top:18px">
+      <div class="card">
+        <span class="tag">SupportState · scratchpad</span>
+        <p>One object flows through every step. The <b style="color:var(--text)">scratchpad</b> is the brain's working memory — the ordered history of <span class="mono">ToolResult</span>s it reads before each decision. That's how it "remembers" the duplicate it just found.</p>
+      </div>
+      <div class="card">
+        <span class="tag">structured handoffs</span>
+        <p>Every handoff is a <b style="color:var(--text)">Pydantic</b> model — <span class="mono">Decision</span>, <span class="mono">ToolResult</span>, <span class="mono">Classification</span>. Agents fit together by contract, and an invalid tool name is rejected at parse time.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · GRAPH + HITL -->
+  <section class="slide" data-band="3:00–4:00" data-who="P1"
+    data-notes="It's a real LangGraph graph: START to supervisor, then continue to tools and loop, or await-human which interrupts, or done/escalate/refuse to END. The pause is a true interrupt() persisted by a Postgres checkpointer keyed by ticket id — so approval can arrive in a separate HTTP request, even after a restart, and resume the exact same run.">
+    <p class="eyebrow"><span class="num">05</span> The graph · human-in-the-loop <span class="who">P1</span></p>
+    <div class="cols two" style="grid-template-columns: 1.25fr 1fr; align-items:start">
+      <div class="graph">START → <b>supervisor</b> ─┬─(continue)──→ <b>tools</b> ──┐
+            │                        │
+            │        ┌───────────────┘  (loop)
+            │        ▼
+            ├─(await_human)→ <span class="g-amber">high_impact</span>  ◀── <span class="g-amber">interrupt() · PAUSE</span>
+            │        │
+            │        ├─(approved)→ <b>supervisor</b>
+            │        └─(sent/reject)→ <span class="g-end">END</span>
+            │
+            └─(done/escalate/refuse)→ <span class="g-end">END</span></div>
+      <div>
+        <div class="card amber">
+          <span class="tag">How the pause survives</span>
+          <p style="color:#D5E0E8"><b style="color:var(--amber)">interrupt()</b> persists the whole graph state via a <b style="color:var(--text)">Postgres checkpointer</b>, keyed by <span class="mono">thread_id = ticket_id</span>.</p>
+        </div>
+        <ul class="clean" style="margin-top:14px">
+          <li>Approval can arrive in a <b>separate HTTP request</b></li>
+          <li>It survives a <b>server restart</b></li>
+          <li><span class="mono">Command(resume=…)</span> reloads and continues the <b>exact same run</b></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 · TOOLS / DATA / RAG -->
+  <section class="slide" data-band="3:10–4:00" data-who="P2"
+    data-notes="The brain acts on ten tools, all returning a structured ToolResult — CRM lookups, past-ticket search, bug filing, refund, draft, email. They're backed by real Postgres. For grounding we use RAG over pgvector: help docs are chunked, embedded to 768-dimension vectors, and searched by meaning, with a grounding threshold that tells the brain to escalate instead of hallucinating. Two things are mocked on purpose: inbound email — a 'new ticket' form — and the refund, which writes a row but doesn't call Stripe. The approval flow is identical either way.">
+    <p class="eyebrow"><span class="num">06</span> Tools · data · RAG <span class="who">P2</span></p>
+    <h2>10 tools. Real Postgres. <span class="hl">Grounded</span> answers.</h2>
+    <div class="cols three">
+      <div class="card">
+        <span class="tag">10 tools → ToolResult</span>
+        <p>CRM lookups, past-ticket search, bug filing, refund, draft, email — every one returns a structured result, backed by <b style="color:var(--text)">real Postgres</b>.</p>
+      </div>
+      <div class="card cyan">
+        <span class="tag">RAG over pgvector</span>
+        <p>Help docs → chunk → embed to <b style="color:var(--text)">768-dim</b> vectors → search by meaning. A <b style="color:var(--text)">grounding threshold</b>: below it, escalate — don't hallucinate.</p>
+      </div>
+      <div class="card amber">
+        <span class="tag">Mocked on purpose</span>
+        <p>Inbound email (a "new ticket" form) and the refund (writes a row, no Stripe). The <b style="color:var(--amber)">approval flow is identical</b> either way.</p>
+      </div>
+    </div>
+    <div style="margin-top:24px">
+      <p class="eyebrow" style="margin-bottom:12px"><span class="num">handoffs</span> all Pydantic — Decision · ToolResult · Classification</p>
+      <div class="toolpath">
+        <span class="node read">lookup_customer</span><span class="arrow">→</span>
+        <span class="node read">lookup_order</span><span class="arrow">→</span>
+        <span class="node">draft_reply</span><span class="arrow">→</span>
+        <span class="node read">retrieve_kb</span><span class="arrow">→</span>
+        <span class="node">send_email</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 · DEMO -->
+  <section class="slide gate-anim" data-band="4:00–7:00" data-who="P3 drives"
+    data-notes="One person clicks; the owner of each ticket talks over it. TCK-1001 'Charged twice' is the hero: Run agent → lookup_customer, lookup_order finds the duplicate, then process_refund — and it PAUSES. It discovered the refund only after the lookup, and it won't move money without a human. Approve → it continues to draft and send. TCK-1002 'PDF crash': search_past_tickets plus retrieve_kb find the known fix → grounded reply, no refund — a bug isn't a refund. TCK-1005 'Write my essay': the brain refuses politely, zero tools run. Then admin: analytics cards, upload a KB doc, re-run a ticket and it now cites it — and agents are blocked from /admin. Pre-warm TCK-1003 before the slot so the first LLM call isn't cold.">
+    <p class="eyebrow"><span class="num">07</span> Live demo <span class="who">P3 drives · owners narrate</span></p>
+    <div class="cols two">
+      <div class="card amber demo-card">
+        <span class="id">TCK-1001 · billing · HITL hero</span>
+        <h3>"Charged twice this month"</h3>
+        <div class="toolpath">
+          <span class="node read">lookup_customer</span><span class="arrow">→</span>
+          <span class="node read">lookup_order</span><span class="arrow">→</span>
+          <span class="node gate">⏸ approve refund</span><span class="arrow">→</span>
+          <span class="node">draft</span><span class="arrow">→</span>
+          <span class="node gate">⏸ send</span>
+        </div>
+        <p class="note">Found the refund only <i>after</i> the lookup — and moves no money without a human.</p>
+      </div>
+      <div class="card demo-card">
+        <span class="id">TCK-1002 · bug · RAG, no refund</span>
+        <h3>"App crashes on PDF export"</h3>
+        <div class="toolpath">
+          <span class="node read">search_past_tickets</span><span class="arrow">+</span>
+          <span class="node read">retrieve_kb</span><span class="arrow">→</span>
+          <span class="node">grounded reply</span>
+        </div>
+        <p class="note">Real Postgres + pgvector KB. A bug isn't a refund — different tools.</p>
+      </div>
+      <div class="card demo-card">
+        <span class="id">TCK-1005 · out-of-scope · guardrail</span>
+        <h3>"Write my essay"</h3>
+        <div class="toolpath">
+          <span class="node" style="border-color:var(--rose);color:var(--rose)">refuse politely · 0 tools</span>
+        </div>
+        <p class="note">Out-of-scope is refused, not answered.</p>
+      </div>
+      <div class="card demo-card">
+        <span class="id">admin · role-gated</span>
+        <h3>Analytics + KB upload</h3>
+        <div class="toolpath">
+          <span class="node">analytics</span><span class="arrow">→</span>
+          <span class="node">upload KB doc</span><span class="arrow">→</span>
+          <span class="node read">re-run cites it</span>
+        </div>
+        <p class="note">Agents are blocked from /admin.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 · EVALUATION + DEBUGGING -->
+  <section class="slide" data-band="7:00–8:30" data-who="P3"
+    data-notes="We have eleven evaluation scenarios — pytest backend/tests/test_eval.py, all green. Each asserts on the brain's tool path and final outcome for a ticket type. They're deterministic: the decider is injectable, so we test the loop, guardrails, and routing — not the LLM's random sampling — and they run with no API key in under a second. Ninety-two tests pass overall. For debugging we use LangSmith: every LLM call and graph step is traced, which is how we caught issues like the brain looping or picking a wrong tool.">
+    <p class="eyebrow"><span class="num">08</span> Evaluation · observability <span class="who">P3</span></p>
+    <div class="stat-row">
+      <div class="stat"><div class="n cyan">11</div><div class="l">eval scenarios</div></div>
+      <div class="stat"><div class="n">92</div><div class="l">tests passing</div></div>
+      <div class="stat"><div class="n amber">&lt;1s</div><div class="l">offline, no API key</div></div>
+    </div>
+    <div class="cols two">
+      <div class="card">
+        <span class="tag">deterministic eval</span>
+        <p>Each scenario asserts on the brain's <b style="color:var(--text)">tool path</b> and <b style="color:var(--text)">final outcome</b>. The decider is injectable — we test the loop, guardrails, and routing, not the LLM's random sampling.</p>
+      </div>
+      <div class="card cyan">
+        <span class="tag">LangSmith tracing</span>
+        <p>Every LLM call and graph step is traced and tagged by ticket id — how we caught the brain looping or picking a wrong tool.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 · GUARDRAILS -->
+  <section class="slide" data-band="7:30–8:30" data-who="P1"
+    data-notes="Eight guardrails keep the brain safe: out-of-scope refuses; low confidence escalates; critical severity escalates; a step budget of eight escalates so there are no infinite loops; a grounding floor — KB match below threshold escalates, no hallucination; a QA/PII pass on every draft; an allow-list so the brain may only emit a valid tool name; and mandatory human approval before refund and email.">
+    <p class="eyebrow"><span class="num">09</span> Guardrails · the governance <span class="who">P1</span></p>
+    <h2>Eight deterministic <span class="hl">guardrails</span> around the LLM.</h2>
+    <div class="guard-grid">
+      <div class="guard"><span class="k">Out-of-scope</span><span class="v">→ refuse</span></div>
+      <div class="guard"><span class="k">Low confidence</span><span class="v">→ escalate</span></div>
+      <div class="guard"><span class="k">Critical severity</span><span class="v">→ escalate</span></div>
+      <div class="guard"><span class="k">Step budget = 8</span><span class="v">→ escalate · no infinite loops</span></div>
+      <div class="guard"><span class="k">Grounding floor</span><span class="v">→ escalate · no hallucination</span></div>
+      <div class="guard"><span class="k">QA / PII pass</span><span class="v">→ on every draft</span></div>
+      <div class="guard"><span class="k">Allow-list</span><span class="v">→ only a valid tool name</span></div>
+      <div class="guard h"><span class="k">Human approval</span><span class="v">→ before refund &amp; email</span></div>
+    </div>
+  </section>
+
+  <!-- 10 · LIMITATIONS -->
+  <section class="slide" data-band="8:15–8:30" data-who="be honest"
+    data-notes="Being honest — evaluators reward it. Refund and inbound email are mocked. The resume path has one reconciliation TODO. RAG is single-vector, no re-ranker yet. And the trace is shown after the run, not streamed live.">
+    <p class="eyebrow"><span class="num">10</span> Limitations · being honest <span class="who">we know</span></p>
+    <ul class="clean" style="font-size:1.12rem">
+      <li><b>Refund &amp; inbound email are mocked</b> — the approval flow is real either way.</li>
+      <li>The resume path has <b>one reconciliation TODO</b>.</li>
+      <li>RAG is <b>single-vector</b> — no re-ranker yet.</li>
+      <li>The trace is shown <b>after</b> the run, not streamed live.</li>
+    </ul>
+  </section>
+
+  <!-- 11 · CONTRIBUTIONS -->
+  <section class="slide" data-band="8:30–10:00" data-who="each ~30s"
+    data-notes="P1 (Harsh 10116): I built the brain — the supervisor loop and guardrails, the three LLM agents, the LangGraph graph with the Postgres-checkpointer HITL, the provider-swappable LLM factory (Gemini or Claude), auth, and the FastAPI surface. P2 (Aman 10055): I built everything the brain acts on — the Postgres schema and seed data, the ten tools, the RAG pipeline, live KB upload, Resend email, the refund mock, the audit log, and analytics. P3 (Harsh 10098): I built the product — the Next.js UI, the reasoning-trace view, the human-approval panel, the admin screens, demo mode, and the eleven-scenario evaluation suite and demo.">
+    <p class="eyebrow"><span class="num">11</span> Who built what <span class="who">each ~30s</span></p>
+    <div class="cols three">
+      <div class="card cyan">
+        <span class="tag">Member A · Harsh 10116</span>
+        <h3>The Brain</h3>
+        <p>Supervisor loop + guardrails, 3 LLM agents, the LangGraph graph with Postgres-checkpointer HITL, the Gemini/Claude provider factory, auth, and the FastAPI surface.</p>
+      </div>
+      <div class="card">
+        <span class="tag">Member B · Aman 10055</span>
+        <h3>Data · Tools · RAG</h3>
+        <p>Postgres schema + seed, the 10 tools, the RAG pipeline (embeddings → pgvector → grounding threshold), live KB upload, Resend email, the refund mock, audit log, analytics.</p>
+      </div>
+      <div class="card">
+        <span class="tag">Member C · Harsh 10098</span>
+        <h3>Frontend · Eval</h3>
+        <p>The Next.js UI, the reasoning-trace view, the human-approval panel, admin screens, demo mode, and the 11-scenario evaluation suite + demo.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 · Q&A -->
+  <section class="slide" data-band="10:00–15:00" data-who="Q&amp;A"
+    data-notes="Thank you. Speed and safety — an AI that resolves in seconds, with a human on every action that matters. Happy to take questions. Quick routing on who answers what is on screen.">
+    <p class="eyebrow"><span class="num">12</span> Questions <span class="who">Q&amp;A · 5 min</span></p>
+    <h2><span class="hl">Speed</span> and <span class="hl-amber">safety.</span> Thank you.</h2>
+    <div class="qa-list">
+      <div class="q">Why a dynamic brain, not a fixed pipeline?</div><div class="a">P1</div>
+      <div class="q">How does the pause survive two HTTP requests?</div><div class="a">P1</div>
+      <div class="q">How do you stop hallucination?</div><div class="a">P2</div>
+      <div class="q">Why pgvector over a dedicated vector DB?</div><div class="a">P2</div>
+      <div class="q">How do you test a non-deterministic LLM?</div><div class="a">P3</div>
+      <div class="q">What's mocked and why?</div><div class="a">P2</div>
+      <div class="q">What stops infinite loops / bad tools?</div><div class="a">P1</div>
+    </div>
+  </section>
+
+</div>
+
+<div class="notes" id="notesDrawer">
+  <p class="label">Speaker notes</p>
+  <p class="script" id="notesText"></p>
+</div>
+
+<div class="bar">
+  <span class="brand">Triage<b>Desk</b></span>
+  <span class="band" id="band"></span>
+  <div class="right">
+    <button class="navbtn" id="prev" aria-label="Previous slide">‹</button>
+    <span class="idx"><span id="cur">1</span> / <span id="total">12</span></span>
+    <button class="navbtn" id="next" aria-label="Next slide">›</button>
+    <span class="hint"><kbd>←</kbd> <kbd>→</kbd> move · <kbd>N</kbd> notes · <kbd>F</kbd> full screen</span>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+    var total = slides.length;
+    var i = 0;
+    var notesOpen = false;
+
+    var bar = document.getElementById("progressBar");
+    var curEl = document.getElementById("cur");
+    var bandEl = document.getElementById("band");
+    var notesDrawer = document.getElementById("notesDrawer");
+    var notesText = document.getElementById("notesText");
+    document.getElementById("total").textContent = total;
+
+    function render() {
+      slides.forEach(function (s, n) { s.classList.toggle("active", n === i); });
+      bar.style.width = ((i + 1) / total * 100) + "%";
+      curEl.textContent = i + 1;
+      var s = slides[i];
+      var band = s.getAttribute("data-band") || "";
+      var who = s.getAttribute("data-who") || "";
+      bandEl.textContent = band + (band && who ? " · " : "") + who;
+      notesText.textContent = s.getAttribute("data-notes") || "";
+      if (history.replaceState) history.replaceState(null, "", "#" + (i + 1));
+    }
+
+    function go(n) {
+      i = Math.max(0, Math.min(total - 1, n));
+      render();
+    }
+
+    function toggleNotes() {
+      notesOpen = !notesOpen;
+      notesDrawer.classList.toggle("open", notesOpen);
+    }
+
+    document.getElementById("next").addEventListener("click", function () { go(i + 1); });
+    document.getElementById("prev").addEventListener("click", function () { go(i - 1); });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight" || e.key === "PageDown") { e.preventDefault(); go(i + 1); }
+      else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); go(i - 1); }
+      else if (e.key === " ") { e.preventDefault(); go(i + (e.shiftKey ? -1 : 1)); }
+      else if (e.key === "Home") { go(0); }
+      else if (e.key === "End") { go(total - 1); }
+      else if (e.key === "n" || e.key === "N") { toggleNotes(); }
+      else if (e.key === "f" || e.key === "F") {
+        if (!document.fullscreenElement) { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); }
+        else { document.exitFullscreen && document.exitFullscreen(); }
+      }
+    });
+
+    // click left/right third of the screen to navigate (but not on the controls/notes)
+    document.getElementById("deck").addEventListener("click", function (e) {
+      var x = e.clientX / window.innerWidth;
+      if (x > 0.62) go(i + 1);
+      else if (x < 0.38) go(i - 1);
+    });
+
+    var start = parseInt((location.hash || "").replace("#", ""), 10);
+    if (start >= 1 && start <= total) i = start - 1;
+    render();
+  })();
+</script>
