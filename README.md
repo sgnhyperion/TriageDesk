@@ -4,9 +4,7 @@ A real multi-agent AI support desk: a **governed supervisor "brain"** dynamicall
 registry of tools to resolve customer tickets (lookups, RAG, refunds, replies), with a **human
 approving every high-impact action** (sending email, processing refunds).
 
-> 📄 **New here? Read [`docs/TEAM_ONBOARDING.md`](docs/TEAM_ONBOARDING.md) first.**
-> **How it all fits together (with diagrams): [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).**
-> Full technical plan: [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md).
+> 📄 **How it all fits together (with diagrams): [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).**
 > The interface contracts everything is built against: [`contracts/`](contracts/).
 
 ## Stack

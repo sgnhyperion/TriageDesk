@@ -5,8 +5,7 @@
 >
 > A *governed supervisor brain* picks tools at runtime (not a fixed flowchart), loops until the
 > ticket is resolved, and **pauses for human approval** before any high-impact action. This doc
-> explains how the pieces fit together. For the talk-track version, see the presentation deck in
-> [`docs/presentation/`](presentation/).
+> explains how the pieces fit together.
 
 ---
 
